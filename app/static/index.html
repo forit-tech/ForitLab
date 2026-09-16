@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forit Lab — лаборатория данных FORIT TECH</title>
+  <meta name="description" content="Единая лаборатория для работы с данными, API и текстом: добыть, создать, исследовать, сравнить и сломать — безопасно, быстро и в одном месте.">
+  <link rel="icon" href="/brand/logo-fox.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="top"><div class="top-inner">
+    <button class="brand" data-nav="home">
+      <img src="/brand/logo-fox.png" alt="FORIT TECH">
+      <span class="wm"><b>FORIT TECH</b><span class="sep">|</span><span class="lab">LAB</span></span>
+    </button>
+    <nav id="nav">
+      <button data-nav="home">Главная</button>
+      <button data-nav="harvester">Harvester</button>
+      <button data-nav="finder">API Finder</button>
+      <button data-nav="burner">Burner</button>
+      <button data-nav="drift">Drift</button>
+      <button data-nav="unicode">Unicode</button>
+      <button data-nav="chaos">Chaos</button>
+    </nav>
+  </div></header>
+
+  <main>
+    <!-- ГЛАВНАЯ -->
+    <section class="view" id="view-home">
+      <section class="hero">
+        <div class="wrap"><div class="hero-content">
+          <div class="eyebrow">Лаборатория FORIT TECH</div>
+          <h1>Твои данные.<br><span class="g">Твои правила.</span></h1>
+          <p class="hero-lead">Forit Lab — единое пространство для работы с данными, API и текстом. Добывай, исследуй, создавай, сравнивай и ломай — безопасно, быстро и в одном месте.</p>
+          <div class="hero-cta">
+            <button class="btn" data-nav="harvester">Начать эксперимент →</button>
+            <button class="btn ghost" data-nav="about">Как это работает?</button>
+          </div>
+          <blockquote class="hero-quote">
+            <span class="mk">“</span>
+            Эксперименты сегодня — лучшие решения завтра.
+            <cite>— FORIT TECH</cite>
+          </blockquote>
+        </div></div>
+      </section>
+
+      <div class="wrap">
+        <section class="tools-sec">
+          <div class="sec-head">
+            <div><h2>Инструменты лаборатории</h2><div class="sub">Выбери инструмент и начни эксперимент</div></div>
+            <a href="/docs" target="_blank">Смотреть документацию →</a>
+          </div>
+          <div class="tool-grid" id="toolGrid"></div>
+        </section>
+      </div>
+
+      <section class="cta">
+        <div class="wrap">
+          <div class="cta-content">
+            <h3>Готов к экспериментам?</h3>
+            <p class="lead">Forit Lab — набор рабочих инструментов FORIT TECH. Используй, улучшай, предлагай идеи или просто исследуй.</p>
+            <div class="cbtns">
+              <a class="btn ghost" href="https://github.com/forit-tech/ForitLab" target="_blank" rel="noopener">⌥ Посмотреть на GitHub</a>
+              <a class="btn" href="https://t.me/BOT3HAK" target="_blank" rel="noopener">💡 Предложить идею</a>
+            </div>
+            <div class="props">
+              <div class="prop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg></div><b>Open Source</b><small>Развиваем вместе</small></div>
+              <div class="prop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6 2 12l6 6M16 6l6 6-6 6"/></svg></div><b>For Developers</b><small>От инженеров для инженеров</small></div>
+              <div class="prop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12c1 1 1 2 1 3h6c0-1 0-2 1-3a7 7 0 0 0-4-12z"/></svg></div><b>Real Projects</b><small>Идеи, которые можно реализовать</small></div>
+            </div>
+          </div>
+          <div class="safe"></div>
+        </div>
+        <footer class="foot"><div class="wrap">
+          <span class="fx"><img src="/brand/logo-fox.png" alt=""><b>FORIT TECH <i>| LAB</i></b> <span style="color:var(--faint)">v0.1.0</span></span>
+          <span class="mid">экспериментируй · исследуй · создавай · улучшай</span>
+          <span>Сделано с ♥ для тех, кто любит данные</span>
+        </div></footer>
+      </section>
+    </section>
+
+    <!-- КАК ЭТО РАБОТАЕТ / О ПРОЕКТЕ -->
+    <section class="view" id="view-about">
+      <div class="tool-hero" style="--tacc:#fb7132">
+        <div class="th-num">?</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .8-1 1.7M12 17h.01"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Как это работает</div>
+          <h2>Что такое Forit Lab</h2>
+          <p>Forit Lab — лаборатория из шести небольших, но серьёзных инструментов для работы с данными, API и текстом. Каждый решает свой этап: найти источник → добыть → создать/испортить → исследовать → сравнить → проверить клиент. Всё работает без базы, очередей и нейросетей — на чистом Python.</p>
+        </div>
+      </div>
+
+      <div class="rblock" style="--tacc:#fb7132"><div class="rb-head"><div class="rb-title"><span class="dotmark"></span>Как устроен конвейер</div></div>
+        <div class="rb-body"><p class="rb-note" style="margin:0">Инструменты соединяются в цепочку. Типичный путь: <b>API Finder</b> находит источник → <b>Web Harvester</b> достаёт данные → <b>Data Burner</b> плодит синтетику с дефектами → <b>Unicode Crime Lab</b> вскрывает текстовый мусор → <b>Drift Lab</b> сравнивает версии → <b>Chaos API</b> проверяет, переживёт ли твой клиент реальную жизнь.</p></div>
+      </div>
+
+      <div id="aboutTools"></div>
+    </section>
+
+    <!-- WEB HARVESTER -->
+    <section class="view" id="view-harvester" style="--tacc:#22d3ee">
+      <div class="tool-hero">
+        <div class="th-num">01</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M8 7l8 4M8 17l8-4"/><rect x="14.5" y="9.5" width="7" height="5" rx="1" opacity=".0"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Web Harvester · извлечение данных</div>
+          <h2>Достань данные со страницы</h2>
+          <p>Вставь ссылку — получишь таблицы, повторяющиеся сущности, метаданные и кандидатов в API. Любую часть можно выгрузить датасетом.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">harvest://input</span></div>
+        <div class="console-body">
+          <div class="field" style="margin-bottom:12px">
+            <label>URL публичной страницы</label>
+            <input type="url" id="hvUrl" placeholder="https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)">
+          </div>
+          <div class="c-actions">
+            <button class="btn" id="hvGo">Анализировать →</button>
+            <button class="btn ghost" id="hvReset">↺ Сбросить</button>
+            <span class="muted">http/https · robots.txt соблюдается · приватные адреса блокируются · JS не исполняется</span>
+          </div>
+        </div>
+      </div>
+      <div id="hvOut"></div>
+    </section>
+
+    <!-- API FINDER -->
+    <section class="view" id="view-finder" style="--tacc:#a855f7">
+      <div class="tool-hero">
+        <div class="th-num">02</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">API Finder · поиск источников</div>
+          <h2>Найди бесплатный API</h2>
+          <p>Только то, чем можно пользоваться бесплатно: free forever, free tier, open data или без ключа. Trial-only не показываем.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">apifinder://query</span></div>
+        <div class="console-body">
+        <div class="row">
+          <div class="field" style="flex:3">
+            <label>Что ищешь? Можно словами: «погода», «курсы валют», «датасет для DS»</label>
+            <input type="text" id="afQuery" placeholder="погода">
+          </div>
+          <div class="field" style="flex:0 0 auto; display:flex; align-items:end; gap:8px;">
+            <button class="btn" id="afSearch">Искать</button>
+            <button class="btn ghost" id="afSurprise" title="Связка API + идея проекта">🎲 Surprise me</button>
+          </div>
+        </div>
+        <div class="chips" id="afCats"></div>
+        <div class="toggle-row">
+          <label class="toggle"><input type="checkbox" id="afNoKey"> Без ключа</label>
+          <label class="toggle"><input type="checkbox" id="afOpenData"> Open data</label>
+          <label class="toggle"><input type="checkbox" id="afFreeTier"> Free tier</label>
+          <label class="toggle"><input type="checkbox" id="afCors"> CORS</label>
+          <span style="margin-left:auto"><button class="btn ghost sm" id="afReset">↺ Сбросить</button>
+          <button class="btn ghost sm" id="afExplore">💡 Explore</button>
+          <button class="btn ghost sm" id="afFav">★ Favorites (<span id="afFavCount">0</span>)</button></span>
+        </div>
+        </div>
+      </div>
+      <div id="afOut"></div>
+    </section>
+
+    <!-- DATA BURNER -->
+    <section class="view" id="view-burner" style="--tacc:#fb7132">
+      <div class="tool-hero">
+        <div class="th-num">03</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a6 6 0 0 0 6-6c0-4-3-6-3-10-2 1.5-3 3-3 5-1-1-1.5-2-1.5-3.5C7 10 6 12 6 16a6 6 0 0 0 6 6z"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Data Burner · генератор данных</div>
+          <h2>Создай синтетику с дефектами</h2>
+          <p>Реалистичные выгрузки с управляемой грязью: пропуски, выбросы, дубли, перекос, unicode-ловушки, сломанные даты. Пара к Drift Lab.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">burner://spec</span></div>
+        <div class="console-body">
+        <div class="row">
+          <div class="field"><label>Пресет</label><select id="buPreset"></select></div>
+          <div class="field"><label>Строк</label><input type="number" id="buRows" value="1000" min="1" max="100000"></div>
+          <div class="field"><label>Формат</label>
+            <select id="buFormat"><option>csv</option><option>tsv</option><option>json</option><option>ndjson</option></select>
+          </div>
+          <div class="field"><label>Seed (необязательно)</label><input type="number" id="buSeed" placeholder="напр. 42"></div>
+        </div>
+        <div id="buPresetDesc" class="muted"></div>
+        <div class="divider"></div>
+        <div class="row">
+          <button class="btn" id="buGen">Сгенерировать и скачать</button>
+          <button class="btn ghost" id="buPreview">Предпросмотр</button>
+          <button class="btn ghost" id="buPair" title="reference + current с дрейфом → Drift Lab">Собрать drift-пару → Drift Lab</button>
+          <button class="btn ghost" id="buReset">↺ Сбросить</button>
+        </div>
+        </div>
+      </div>
+      <div id="buOut"></div>
+    </section>
+
+    <!-- DRIFT LAB -->
+    <section class="view" id="view-drift" style="--tacc:#3b82f6">
+      <div class="tool-hero">
+        <div class="th-num">04</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16c4 0 4-9 8-9s4 7 8 7"/><path d="M3 12c4 0 4-6 8-6" opacity=".55"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Drift Lab · сравнение версий</div>
+          <h2>Сравни две выгрузки</h2>
+          <p>reference vs current: смена схемы, распределения (PSI, KS), категории, пропуски, утечка идентификаторов — с объяснением, а не «drift = 0.42».</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">drift://compare</span></div>
+        <div class="console-body">
+        <div class="row">
+          <div class="field"><label>reference (файл CSV/JSON)</label><input type="file" id="drRef" accept=".csv,.tsv,.json,.jsonl,.ndjson"></div>
+          <div class="field"><label>current (файл CSV/JSON)</label><input type="file" id="drCur" accept=".csv,.tsv,.json,.jsonl,.ndjson"></div>
+        </div>
+        <div class="row">
+          <button class="btn" id="drGo">Сравнить</button>
+          <button class="btn ghost" id="drDemo">Запустить демо</button>
+          <button class="btn ghost" id="drReset">↺ Сбросить</button>
+        </div>
+        <div class="muted">Нет файлов под рукой? «Демо» прогонит встроенный датасет с подложенным дрейфом. Или собери пару в Data Burner.</div>
+        </div>
+      </div>
+      <div id="drOut"></div>
+    </section>
+
+    <!-- UNICODE CRIME LAB -->
+    <section class="view" id="view-unicode" style="--tacc:#c084fc">
+      <div class="tool-hero">
+        <div class="th-num">05</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19 9.5 6h1L16 19M6 14h8"/><path d="M19 8v6" opacity=".5"/><path d="M19 18v.5" opacity=".5"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Unicode Crime Lab · разбор текста</div>
+          <h2>Раскопай текстовый трэш</h2>
+          <p>Невидимые символы, zero-width, NBSP, NFC/NFD, кириллица под видом латиницы — с подсветкой прямо в тексте.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">unicode://inspect</span></div>
+        <div class="console-body">
+        <div class="field">
+          <label>Вставь строку для вскрытия</label>
+          <textarea id="unText" placeholder="admin​   (тут может прятаться zero-width)"></textarea>
+        </div>
+        <div class="row">
+          <button class="btn" id="unGo">Вскрыть</button>
+          <button class="btn ghost" id="unReset">↺ Сбросить</button>
+          <select id="unSample" class="btn ghost" style="color:var(--text)"><option value="">— строки-ловушки —</option></select>
+        </div>
+        </div>
+      </div>
+      <div id="unOut"></div>
+    </section>
+
+    <!-- CHAOS API -->
+    <section class="view" id="view-chaos" style="--tacc:#f43f5e">
+      <div class="tool-hero">
+        <div class="th-num">06</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Chaos API · стресс клиента</div>
+          <h2>Сломай свой клиент</h2>
+          <p>Собери эндпоинт, который ведёт себя как мудак: задержки, 5xx, битый JSON, гигантский ответ, враждебные заголовки. Проверь, переживёт ли клиент реальную жизнь.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">chaos://constructor</span></div>
+        <div class="console-body">
+        <h3 style="margin-top:0">Конструктор поведения</h3>
+        <div class="row">
+          <div class="field"><label>HTTP-статус</label><input type="number" id="chStatus" value="503" min="100" max="599"></div>
+          <div class="field"><label>Задержка, мс</label><input type="number" id="chDelay" value="2000" min="0"></div>
+          <div class="field"><label>Тело</label>
+            <select id="chBody">
+              <option value="json">валидный JSON</option>
+              <option value="malformed_json">битый JSON</option>
+              <option value="text">текст</option>
+              <option value="html">HTML под видом JSON</option>
+              <option value="empty">пустое</option>
+              <option value="huge">гигантское</option>
+            </select>
+          </div>
+          <div class="field"><label>Доля случайных сбоев</label><input type="number" id="chFail" value="0" min="0" max="1" step="0.1"></div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="chHostile"> Добавить враждебные заголовки</label>
+        <div class="divider"></div>
+        <div class="field">
+          <label>Готовый URL — копируй в свой клиент</label>
+          <div class="copy-row">
+            <input type="text" id="chUrl" readonly>
+            <button class="btn sm" id="chCopy">Копировать</button>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="chTry">Попробовать здесь</button>
+          <button class="btn ghost" id="chReset">↺ Сбросить</button>
+          <a class="btn ghost sm" href="/api/chaos/scenarios" target="_blank" style="display:inline-flex;align-items:center">Все сценарии</a>
+        </div>
+        </div>
+      </div>
+      <div id="chOut"></div>
+    </section>
+  </main>
+
+  <div id="toasts"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

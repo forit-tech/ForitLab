@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forit Lab — вариант A · Node Lab</title>
+<link rel="icon" href="/brand/forit-tech-logo.png">
+<style>
+:root{
+  --bg:#0a0710; --bg2:#0f0b18; --panel:rgba(26,20,38,0.55); --panel-solid:#171122;
+  --border:rgba(139,124,246,0.16); --border-hi:rgba(139,124,246,0.4);
+  --text:#eee8f7; --dim:#a99fc0; --faint:#6f6685;
+  --violet:#8b5cf6; --violet-lt:#a78bfa; --orange:#fb923c; --amber:#f59e0b;
+  --m1:var(--violet-lt); --m2:var(--orange);
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.55;
+  background-image:
+    radial-gradient(900px 500px at 78% -8%, rgba(251,146,60,0.10), transparent 60%),
+    radial-gradient(900px 600px at 10% 0%, rgba(139,92,246,0.16), transparent 55%),
+    linear-gradient(rgba(139,124,246,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,124,246,0.045) 1px, transparent 1px);
+  background-size:auto,auto,34px 34px,34px 34px; background-attachment:fixed;}
+a{color:var(--violet-lt);text-decoration:none}
+
+.vbar{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font-size:.8rem;
+  background:rgba(10,7,16,.7);border-bottom:1px solid var(--border);backdrop-filter:blur(8px);position:sticky;top:0;z-index:30}
+.vbar b{color:var(--dim);font-weight:600;margin-right:4px}
+.vbar a{padding:4px 12px;border:1px solid var(--border);border-radius:999px;color:var(--dim)}
+.vbar a.on{background:linear-gradient(135deg,var(--violet),var(--orange));color:#fff;border-color:transparent}
+
+header{display:flex;align-items:center;gap:14px;padding:20px clamp(16px,5vw,56px)}
+.mark{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--violet-lt),var(--orange));
+  box-shadow:0 0 30px rgba(251,146,60,.28);display:grid;place-items:center;position:relative;overflow:hidden}
+.mark svg{width:24px;height:24px}
+.wordmark{line-height:1.05}
+.wordmark .t{font-weight:800;letter-spacing:.14em;font-size:.82rem;color:var(--dim)}
+.wordmark .l{font-weight:800;letter-spacing:.02em;font-size:1.15rem;
+  background:linear-gradient(90deg,var(--violet-lt),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+header nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+header nav a{color:var(--dim);padding:7px 12px;border-radius:9px;font-size:.9rem}
+header nav a:hover{background:var(--panel);color:var(--text)}
+
+main{max-width:1120px;margin:0 auto;padding:10px clamp(16px,5vw,56px) 80px}
+
+.hero{text-align:center;padding:36px 0 20px;position:relative}
+.badge-lab{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;
+  color:var(--violet-lt);border:1px solid var(--border-hi);border-radius:999px;padding:5px 14px;text-transform:uppercase}
+.badge-lab .dot{width:7px;height:7px;border-radius:50%;background:var(--orange);box-shadow:0 0 10px var(--orange);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-size:clamp(2.1rem,5.5vw,3.4rem);margin:18px 0 12px;letter-spacing:-.02em;font-weight:800}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--violet-lt),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--dim);font-size:1.12rem;max-width:600px;margin:0 auto 30px}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:0;justify-content:center;flex-wrap:wrap;margin:0 auto;max-width:900px}
+.pnode{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 6px;flex:1;min-width:120px}
+.pnode .ring{width:52px;height:52px;border-radius:14px;background:var(--panel);border:1px solid var(--border-hi);
+  display:grid;place-items:center;backdrop-filter:blur(6px);transition:.2s;position:relative;z-index:2}
+.pnode .ring svg{width:30px;height:30px}
+.pnode:hover .ring{border-color:var(--orange);box-shadow:0 0 24px rgba(251,146,60,.25);transform:translateY(-3px)}
+.pnode small{font-size:.78rem;color:var(--dim);text-align:center;max-width:110px}
+.pnode .num{position:absolute;top:-8px;right:14px;font-family:var(--mono);font-size:.62rem;color:var(--faint);z-index:3}
+.pnode:not(:last-child)::after{content:"";position:absolute;top:26px;right:-4px;width:calc(50% + 8px);height:1px;
+  background:linear-gradient(90deg,var(--violet),transparent);z-index:1}
+.pnode:not(:first-child)::before{content:"";position:absolute;top:26px;left:-4px;width:calc(50% + 8px);height:1px;
+  background:linear-gradient(90deg,transparent,var(--violet));z-index:1}
+
+.section-t{display:flex;align-items:center;gap:12px;margin:54px 0 20px}
+.section-t h2{font-size:1.35rem;margin:0;font-weight:700}
+.section-t .line{flex:1;height:1px;background:var(--border)}
+.section-t .tag{font-family:var(--mono);font-size:.72rem;color:var(--faint)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+.card{position:relative;border-radius:18px;padding:20px;background:var(--panel);border:1px solid var(--border);
+  backdrop-filter:blur(10px);overflow:hidden;transition:.22s;display:flex;flex-direction:column;gap:12px}
+.card::before{content:"";position:absolute;inset:0;border-radius:18px;padding:1px;background:linear-gradient(135deg,rgba(139,124,246,.4),transparent 40%,rgba(251,146,60,.3));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:.22s}
+.card:hover{transform:translateY(-4px);border-color:var(--border-hi)}
+.card:hover::before{opacity:1}
+.card .preview{height:120px;border-radius:12px;background:rgba(10,7,16,.5);border:1px solid var(--border);display:grid;place-items:center;overflow:hidden}
+.card .preview .motif{width:100%;height:100%}
+.card h3{margin:2px 0 0;font-size:1.18rem}
+.card p{margin:0;color:var(--dim);font-size:.92rem}
+.card .foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between}
+.card .go{color:var(--orange);font-weight:600;font-size:.9rem}
+.card .idx{font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+
+/* мотивы */
+.motif .mdim{stroke:rgba(169,159,192,.35)}
+.motif .mln{stroke:var(--m1)} .motif .mln2{stroke:var(--m2)}
+.motif .mfl{fill:var(--m1)} .motif .mfl2{fill:var(--m2)}
+.motif .mpanel{fill:rgba(139,124,246,.06);stroke:var(--border-hi);stroke-width:1}
+.motif .mhub{fill:var(--violet);}
+.motif .mnode circle{fill:rgba(139,124,246,.5)}
+.motif .mburn rect{fill:rgba(251,146,60,.18);stroke:var(--orange);stroke-width:1}
+.motif .mtxt{fill:var(--orange)} .motif .mtxt2{fill:var(--faint)}
+.motif .mtxt-strong{fill:var(--text)} .motif .mfl2-text{fill:var(--orange)}
+.motif .mghost{fill:rgba(251,146,60,.08);stroke:var(--orange);stroke-width:1.2}
+.motif .mchip-ok{fill:rgba(63,185,80,.16);stroke:rgba(63,185,80,.6)}
+.motif .mchip-warn{fill:rgba(245,158,11,.16);stroke:rgba(245,158,11,.6)}
+.motif .mchip-alert{fill:rgba(248,81,73,.16);stroke:rgba(248,81,73,.6)}
+
+footer{text-align:center;padding:40px;color:var(--faint);font-size:.85rem;border-top:1px solid var(--border);margin-top:40px}
+
+.brandimg{width:42px;height:42px;border-radius:11px;object-fit:cover;display:none;box-shadow:0 0 26px rgba(251,146,60,.3)}
+body.has-logo .brandimg{display:block}
+body.has-logo .mark{display:none}
+</style>
+</head>
+<body>
+<div class="vbar"><b>Вариант оформления:</b>
+  <a class="on" href="/variants/a.html">A · Node Lab</a>
+  <a href="/variants/b.html">B · Schematic</a>
+  <a href="/variants/c.html">C · Signal</a>
+  <a href="/variants/">← все варианты</a>
+</div>
+
+<header>
+  <img src="/brand/forit-tech-logo.png" alt="Forit Tech" class="brandimg" onload="document.body.classList.add('has-logo')" onerror="this.remove()">
+  <div class="mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/>
+      <path d="M7.6 7.6 10.8 16 M16.4 7.6 13.2 16 M8 6h8"/>
+    </svg>
+  </div>
+  <div class="wordmark"><div class="t">FORIT TECH</div><div class="l">/ LAB</div></div>
+  <nav id="nav"></nav>
+</header>
+
+<main>
+  <section class="hero">
+    <span class="badge-lab"><span class="dot"></span>лаборатория данных · Forit Tech</span>
+    <h1>Инструменты для работы<br>с <em>данными и API</em></h1>
+    <p>Единая лаборатория: добыть данные, создать или испортить, исследовать текст, сравнить версии и сломать свой HTTP-клиент раньше пользователей.</p>
+    <div class="pipe" id="pipe"></div>
+  </section>
+
+  <div class="section-t"><h2>Инструменты</h2><div class="line"></div><span class="tag">6 модулей · одна система</span></div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer>FORIT TECH / LAB · шесть инструментов · без pandas, numpy и scipy · работает на бесплатном хостинге</footer>
+
+<script src="/variants/motifs.js"></script>
+<script>
+const nav=document.getElementById('nav');
+TOOLS.forEach(t=>{const a=document.createElement('a');a.href=t.href;a.textContent=t.name;nav.append(a);});
+const pipe=document.getElementById('pipe');
+PIPELINE.forEach((p,i)=>{
+  const el=document.createElement('div');el.className='pnode';
+  el.innerHTML=`<span class="num">0${i+1}</span><div class="ring">${MOTIFS[p.k].replace('viewBox="0 0 320 130"','viewBox="60 10 200 110"')}</div><small>${p.t}</small>`;
+  pipe.append(el);
+});
+const grid=document.getElementById('grid');
+TOOLS.forEach((t,i)=>{
+  const c=document.createElement('a');c.className='card';c.href=t.href;
+  c.innerHTML=`<div class="preview">${MOTIFS[t.id]}</div><h3>${t.name}</h3><p>${t.tag}</p>
+    <div class="foot"><span class="go">${t.verb} →</span><span class="idx">MOD.0${i+1}</span></div>`;
+  grid.append(c);
+});
+</script>
+</body>
+</html>

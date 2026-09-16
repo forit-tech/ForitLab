@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forit Lab — выбор стиля</title>
+<style>
+:root{--bg:#0a0710;--panel:#150f20;--border:rgba(139,124,246,.18);--text:#eee8f7;--dim:#a99fc0;--faint:#6f6685;
+  --violet:#8b5cf6;--violet-lt:#a78bfa;--orange:#fb923c;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.55;
+  background-image:radial-gradient(800px 500px at 80% -10%,rgba(251,146,60,.1),transparent 60%),radial-gradient(800px 500px at 10% 0,rgba(139,92,246,.16),transparent 55%)}
+a{color:var(--violet-lt);text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:48px clamp(16px,5vw,48px) 80px}
+.head{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.mark{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--violet-lt),var(--orange));box-shadow:0 0 28px rgba(251,146,60,.28);display:grid;place-items:center}
+.mark svg{width:24px;height:24px}
+.wm .t{font-weight:800;letter-spacing:.16em;font-size:.72rem;color:var(--dim)}
+.wm .l{font-weight:800;font-size:1.1rem;background:linear-gradient(90deg,var(--violet-lt),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-size:clamp(1.8rem,4vw,2.6rem);margin:28px 0 8px;letter-spacing:-.02em}
+.sub{color:var(--dim);max-width:640px;margin:0 0 12px}
+.note{color:var(--faint);font-size:.88rem;max-width:680px;margin:0 0 36px;border-left:2px solid var(--orange);padding-left:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.vc{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--panel);transition:.2s;display:flex;flex-direction:column}
+.vc:hover{transform:translateY(-4px);border-color:var(--orange);box-shadow:0 16px 40px rgba(139,92,246,.2)}
+.vc .thumb{height:150px;position:relative;overflow:hidden;border-bottom:1px solid var(--border)}
+.vc .b{padding:18px}
+.vc .tag{font-family:var(--mono);font-size:.72rem;color:var(--orange);letter-spacing:.08em}
+.vc h3{margin:6px 0 6px;font-size:1.25rem}
+.vc p{margin:0 0 14px;color:var(--dim);font-size:.9rem}
+.vc .open{display:inline-block;background:linear-gradient(135deg,var(--violet),var(--orange));color:#fff;padding:9px 18px;border-radius:9px;font-weight:600;font-size:.9rem}
+/* thumbnails */
+.tA{background:linear-gradient(135deg,#0f0b18,#0a0710);background-image:linear-gradient(rgba(139,124,246,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(139,124,246,.09) 1px,transparent 1px);background-size:20px 20px}
+.tB{background:#080a0f;background-image:linear-gradient(rgba(56,189,248,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.08) 1px,transparent 1px);background-size:16px 16px}
+.tC{background:radial-gradient(circle at 30% 30%,rgba(139,92,246,.5),transparent 60%),radial-gradient(circle at 75% 60%,rgba(251,146,60,.4),transparent 60%),#0b0810}
+.thumb .demo{position:absolute;inset:0;display:grid;place-items:center}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.glass{position:absolute;inset:24px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);backdrop-filter:blur(4px)}
+.foot{margin-top:40px;color:var(--faint);font-size:.85rem}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-family:var(--mono);font-size:.72rem;color:var(--dim);margin-right:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M7.6 7.6 10.8 16 M16.4 7.6 13.2 16 M8 6h8"/></svg></div>
+    <div class="wm"><div class="t">FORIT TECH</div><div class="l">/ LAB</div></div>
+  </div>
+  <h1>Выбери оформление лаборатории</h1>
+  <p class="sub">Три полноценных шаблона главной в брендинге Forit Tech (фиолетовый → оранжевый, тёмные поверхности, data-мотивы). Открой каждый, потом скажи букву — я раскатаю выбранный стиль на все шесть инструментов.</p>
+  <p class="note">Отдельного файла логотипа Forit Tech в проектах не нашлось. Я переиспользовал фирменный язык из <b>forit-ai-teamhub</b> (градиентный знак + wordmark). Если пришлёшь настоящий логотип (SVG/PNG) — вставлю его вместо знака-заглушки.</p>
+
+  <div class="cards">
+    <div class="vc" style="border-color:var(--orange)">
+      <div class="thumb" style="background:radial-gradient(circle at 65% 30%,rgba(251,113,50,.55),transparent 55%),radial-gradient(circle at 20% 80%,rgba(244,63,94,.35),transparent 60%),#0a0608"><div class="demo" style="font-size:2.4rem">🦊</div></div>
+      <div class="b"><div class="tag" style="color:var(--orange)">ВАРИАНТ D · твой макет</div><h3>Ember</h3><p>Огненный бренд Forit Tech: лиса-маскот в hero, «Твои данные. Твои правила.», стат-плитки, у каждого инструмента свой неоновый акцент, CTA-полоса. Ближе всего к присланному макету.</p><a class="open" href="/variants/d.html">Открыть D →</a></div>
+    </div>
+    <div class="vc">
+      <div class="thumb tA"><div class="glass"></div><div class="demo"><span class="dot" style="background:var(--violet-lt);box-shadow:0 0 20px var(--violet-lt)"></span></div></div>
+      <div class="b"><div class="tag">ВАРИАНТ A</div><h3>Node Lab</h3><p>Node-граф в hero, стеклянные панели, спокойное свечение, центрированная композиция. Ближе всего к «графу данных».</p><a class="open" href="/variants/a.html">Открыть A →</a></div>
+    </div>
+    <div class="vc">
+      <div class="thumb tB"><div class="demo" style="font-family:var(--mono);color:#38bdf8;font-size:.8rem;letter-spacing:.1em">SYS://lab ▸</div></div>
+      <div class="b"><div class="tag">ВАРИАНТ B</div><h3>Schematic</h3><p>Инженерная консоль: blueprint-сетка, моноширинные метки, левый hero, конвейер-схема. Строгий технический характер.</p><a class="open" href="/variants/b.html">Открыть B →</a></div>
+    </div>
+    <div class="vc">
+      <div class="thumb tC"><div class="glass" style="inset:30px;border-color:rgba(255,255,255,.18)"></div></div>
+      <div class="b"><div class="tag">ВАРИАНТ C</div><h3>Signal</h3><p>Аврора-градиенты, анимированная волна данных, крупная типографика, bento-раскладка. Самый «продуктовый» и живой.</p><a class="open" href="/variants/c.html">Открыть C →</a></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="chip">русский UI</span><span class="chip">технические термины — англ</span><span class="chip">SVG-мотивы вместо emoji</span><span class="chip">без тяжёлых зависимостей</span>
+    <p>Все три — только главная-витрина (демо стиля). Backend и рабочие инструменты не тронуты. Выберешь — применю стиль ко всему приложению и внутренним страницам.</p>
+  </div>
+</div>
+</body>
+</html>

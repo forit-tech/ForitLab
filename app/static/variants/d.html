@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forit Lab — вариант D · Ember</title>
+<link rel="icon" href="/brand/logo-fox.png">
+<style>
+:root{
+  --bg:#050406; --bg2:#0a0709; --panel:rgba(20,14,18,.7); --panel2:rgba(28,20,26,.65);
+  --border:#2a1f28; --border-hi:#3c2a34;
+  --text:#f4ede7; --dim:#b3a4aa; --faint:#6d5e66;
+  --ember:#fb7132; --ember-lt:#ffa14a; --amber:#f5b53c; --red:#f43f5e;
+  --cyan:#22d3ee; --blue:#3b82f6; --violet:#a855f7; --magenta:#e05fd6;
+  --maxw:1860px;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.5;overflow-x:hidden;
+  background-image:radial-gradient(1200px 700px at 100% 0,rgba(251,113,50,.10),transparent 60%),radial-gradient(900px 600px at 0% 60%,rgba(168,85,247,.05),transparent 60%)}
+a{color:var(--ember-lt);text-decoration:none}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(24px,4vw,72px)}
+
+/* variant switch */
+.vbar{display:flex;gap:8px;align-items:center;justify-content:center;padding:7px;font-size:.78rem;
+  background:rgba(5,4,6,.9);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:60}
+.vbar b{color:var(--dim);margin-right:4px}
+.vbar a{padding:3px 11px;border:1px solid var(--border);border-radius:999px;color:var(--dim)}
+.vbar a.on{background:linear-gradient(135deg,var(--ember),var(--red));color:#fff;border-color:transparent}
+
+/* header — плавающая полупрозрачная плашка поверх hero */
+.hdr{position:absolute;top:18px;left:0;right:0;z-index:50;display:flex;justify-content:center;pointer-events:none}
+.hdr .bar{pointer-events:auto;width:min(calc(100% - 2*clamp(24px,4vw,72px)),var(--maxw));
+  display:flex;align-items:center;gap:20px;height:70px;padding:0 14px 0 20px;border-radius:16px;
+  background:rgba(10,7,10,.55);backdrop-filter:blur(16px);border:1px solid rgba(251,113,50,.18);
+  box-shadow:0 10px 40px rgba(0,0,0,.5),0 0 34px rgba(251,113,50,.08)}
+.brand{display:flex;align-items:center;gap:11px;flex:0 0 auto}
+.brand img{width:44px;height:44px;object-fit:contain;filter:drop-shadow(0 0 14px rgba(251,113,50,.55))}
+.brand .wm{font-weight:800;font-size:1.12rem;letter-spacing:.01em;white-space:nowrap}
+.brand .wm b{background:linear-gradient(90deg,var(--ember-lt),var(--amber));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand .wm .sep{color:var(--faint);margin:0 4px;font-weight:400}
+.brand .wm .lab{color:var(--dim);letter-spacing:.14em;font-size:.98rem}
+.hdr nav{display:flex;gap:4px;margin-left:14px}
+.hdr nav a{color:var(--dim);padding:8px 14px;border-radius:9px;font-size:.92rem}
+.hdr nav a:hover{background:var(--panel);color:var(--text)}
+.hdr nav a.active{background:rgba(251,113,50,.14);color:var(--ember-lt)}
+.hdr .search{margin-left:auto;display:flex;align-items:center;gap:9px;background:rgba(18,13,16,.8);border:1px solid var(--border);
+  border-radius:11px;padding:9px 13px;color:var(--faint);font-size:.86rem;min-width:270px}
+.hdr .search kbd{margin-left:auto;font-family:var(--mono);font-size:.68rem;border:1px solid var(--border-hi);border-radius:4px;padding:1px 5px;color:var(--dim)}
+.iconbtn{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:rgba(18,13,16,.8);color:var(--dim);cursor:pointer;display:grid;place-items:center;font-size:1.05rem}
+.cta-top{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--ember),var(--red));color:#fff;border:none;border-radius:11px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 0 24px rgba(251,113,50,.35);white-space:nowrap}
+
+/* HERO — full-bleed immersive scene до самого верха */
+.hero{position:relative;min-height:clamp(720px,96vh,1040px);display:flex;align-items:center;isolation:isolate;overflow:hidden}
+/* Оригинальный PNG напрямую, без перекодирования. Лиса поднята за счёт
+   background-position-y (показываем более нижнюю часть исходника), не transform. */
+.hero::before{content:"";position:absolute;inset:0;z-index:-2;
+  background-image:url('/brand/hero.png');background-repeat:no-repeat;background-size:cover;background-position:center 88%;}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(4,4,7,.97) 0%,rgba(4,4,7,.88) 20%,rgba(4,4,7,.42) 38%,rgba(4,4,7,.06) 60%,transparent 76%),
+    linear-gradient(0deg,var(--bg) 0%,rgba(5,4,6,.5) 12%,rgba(5,4,6,0) 38%)}
+.hero .wrap{width:100%}
+.hero-content{max-width:560px;padding:120px 0 40px}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.24em;color:var(--ember);text-transform:uppercase;margin-bottom:18px}
+.hero h1{font-size:clamp(2.6rem,4.6vw,4.6rem);line-height:1.0;margin:0 0 20px;letter-spacing:-.02em;font-weight:800}
+.hero h1 .g{background:linear-gradient(92deg,var(--ember),var(--ember-lt) 60%,var(--amber));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--dim);font-size:1.12rem;max-width:440px;margin:0 0 28px}
+.hero-cta{display:flex;gap:13px;flex-wrap:wrap;margin-bottom:24px}
+.btn{border:none;border-radius:12px;padding:13px 24px;font:inherit;font-weight:700;cursor:pointer;font-size:.96rem;transition:.15s}
+.btn.primary{background:linear-gradient(135deg,var(--ember),var(--red));color:#fff;box-shadow:0 0 28px rgba(251,113,50,.4)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:rgba(18,13,16,.7);color:var(--text);border:1px solid var(--border-hi)}
+.hero-quote{margin:0;max-width:460px;position:relative;padding-left:20px;
+  border-left:3px solid var(--ember);color:var(--text);font-size:1.18rem;font-style:italic;line-height:1.45}
+.hero-quote .mk{position:absolute;left:8px;top:-10px;font-size:2.4rem;color:var(--ember);opacity:.5;font-family:Georgia,serif}
+.hero-quote cite{display:block;margin-top:8px;font-style:normal;font-size:.9rem;color:var(--ember-lt);font-weight:600}
+
+/* STATS — directly under hero, glassy */
+.stats-wrap{margin-top:-46px;position:relative;z-index:5}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.stats{grid-template-columns:1fr}}
+.stat{background:linear-gradient(160deg,rgba(24,17,22,.86),rgba(14,10,13,.78));border:1px solid var(--border);border-radius:15px;
+  padding:17px 20px;display:flex;align-items:center;gap:15px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.stat .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--border-hi)}
+.stat .ic svg{width:23px;height:23px}
+.stat .v{font-size:1.75rem;font-weight:800;line-height:1}
+.stat .l{color:var(--dim);font-size:.82rem;margin-top:4px}
+.stat.quote{font-size:.9rem;color:var(--dim);font-style:italic;display:block;align-content:center}
+.stat.quote .by{color:var(--ember-lt);font-style:normal;font-size:.8rem;margin-top:8px}
+
+/* TOOLS — six in one row */
+.sec{padding:64px 0 0}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:26px}
+.sec-head h2{font-size:1.7rem;margin:0 0 4px;font-weight:800;position:relative;padding-left:15px}
+.sec-head h2::before{content:"";position:absolute;left:0;top:5px;bottom:3px;width:4px;border-radius:3px;background:linear-gradient(var(--ember),var(--red))}
+.sec-head .sub{color:var(--dim);font-size:.92rem;padding-left:15px}
+.sec-head a{font-size:.9rem;white-space:nowrap}
+.tools{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+@media(max-width:1400px){.tools{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:820px){.tools{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.tools{grid-template-columns:1fr}}
+.tcard{position:relative;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,rgba(26,18,24,.7),rgba(12,9,11,.85));
+  border:1px solid color-mix(in srgb,var(--tacc) 26%,var(--border));transition:.2s}
+.tcard:hover{transform:translateY(-6px);border-color:color-mix(in srgb,var(--tacc) 70%,transparent);
+  box-shadow:0 20px 44px rgba(0,0,0,.55),0 0 34px color-mix(in srgb,var(--tacc) 26%,transparent)}
+/* полная иллюстрация, без crop: квадратный медиа-контейнер + object-fit:contain */
+.tcard .art{position:relative;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#080b11}
+.tcard .art img{width:100%;height:100%;object-fit:contain;object-position:center}
+.tcard .num{position:absolute;top:11px;left:12px;z-index:2;font-family:var(--mono);font-size:.74rem;font-weight:700;
+  color:var(--tacc);background:rgba(5,4,6,.6);border:1px solid color-mix(in srgb,var(--tacc) 40%,transparent);border-radius:6px;padding:2px 8px}
+.tcard .body{padding:15px 17px 17px;display:flex;flex-direction:column;gap:10px;flex:1;position:relative;z-index:2;border-top:1px solid var(--border)}
+.tcard h3{margin:0;font-size:1.24rem}
+.tcard p{margin:0;color:var(--dim);font-size:.9rem;flex:1}
+.tcard .tagrow{display:flex;gap:6px;flex-wrap:wrap}
+.tcard .tg{font-size:.72rem;color:var(--dim);border:1px solid var(--border-hi);border-radius:6px;padding:2px 8px;font-family:var(--mono)}
+.tcard .go{border:none;border-radius:10px;padding:11px;font:inherit;font-weight:700;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--tacc) 92%,#000),color-mix(in srgb,var(--tacc) 52%,#000));
+  box-shadow:0 0 20px color-mix(in srgb,var(--tacc) 30%,transparent)}
+
+/* CTA — иммерсивная сцена до самого низа, футер плашкой поверх */
+.cta{position:relative;margin-top:70px;min-height:clamp(460px,64vh,680px);display:flex;flex-direction:column;justify-content:center;overflow:hidden;isolation:isolate;
+  border-top:1px solid var(--border);padding-bottom:64px}
+.cta::before{content:"";position:absolute;inset:0;z-index:-2;background-image:url('/brand/cta-bg.png');background-size:cover;background-position:right center}
+/* тёмный градиент только слева/центр — правая safe-zone с лисой почти не затемняется */
+.cta::before{background-position:78% center}
+.cta::after{content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(90deg,#050406 0%,rgba(5,4,6,.92) 34%,rgba(5,4,6,.5) 54%,rgba(5,4,6,.1) 68%,rgba(5,4,6,0) 82%)}
+.cta .wrap{width:100%;display:grid;grid-template-columns:1.2fr .8fr;gap:34px;align-items:center;padding:56px clamp(24px,4vw,72px)}
+.cta-content{display:flex;flex-direction:column;gap:22px}
+.cta .safe{min-height:1px}
+@media(max-width:1000px){.cta .wrap{grid-template-columns:1fr}.cta .safe{display:none}
+  .cta::after{background:linear-gradient(180deg,#050406 0%,rgba(5,4,6,.86) 60%,rgba(5,4,6,.5) 100%)}}
+.cta h3{margin:0 0 10px;font-size:1.7rem;font-weight:800}
+.cta .lead{color:var(--dim);margin:0 0 20px;max-width:360px}
+.cbtns{display:flex;gap:12px;flex-wrap:wrap}
+.props{display:flex;gap:40px;flex-wrap:wrap}
+.prop{max-width:190px}
+@media(max-width:560px){.props{gap:24px}}
+.prop .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--border-hi);margin-bottom:9px;background:rgba(18,13,16,.6)}
+.prop .ic svg{width:21px;height:21px;color:var(--ember-lt)}
+.prop b{display:block;font-size:.94rem}
+.prop small{color:var(--faint);font-size:.78rem}
+
+/* footer — тонкая плашка поверх низа CTA-сцены */
+.foot{position:absolute;left:0;right:0;bottom:0;z-index:3}
+.foot .wrap{display:flex;align-items:center;gap:16px;padding:14px clamp(24px,4vw,72px);color:var(--dim);font-size:.82rem;flex-wrap:wrap;
+  background:linear-gradient(0deg,rgba(5,4,6,.86),rgba(5,4,6,.2));backdrop-filter:blur(4px);max-width:100%}
+.foot .fx{display:flex;align-items:center;gap:9px}
+.foot .fx img{width:26px;height:26px;object-fit:contain}
+.foot .fx b{color:var(--text);font-weight:800} .foot .fx b i{font-style:normal;color:var(--ember-lt)}
+.foot .mid{margin:0 auto;font-family:var(--mono);font-size:.78rem}
+</style>
+</head>
+<body>
+<div class="vbar"><b>Вариант:</b>
+  <a href="/variants/a.html">A</a><a href="/variants/b.html">B</a><a href="/variants/c.html">C</a>
+  <a class="on" href="/variants/d.html">D · Ember</a><a href="/variants/">← все</a>
+</div>
+
+<section class="hero">
+  <header class="hdr"><div class="bar">
+    <div class="brand">
+      <img src="/brand/logo-fox.png" alt="Forit Tech">
+      <span class="wm"><b>FORIT TECH</b><span class="sep">|</span><span class="lab">LAB</span></span>
+    </div>
+    <nav>
+      <a class="active" href="#">Главная</a><a href="#tools">Инструменты</a>
+      <a href="/docs" target="_blank">Документация</a><a href="#cta">О проекте</a>
+    </nav>
+    <div class="search">🔎 Поиск инструментов, API, данных… <kbd>Ctrl K</kbd></div>
+    <button class="iconbtn" title="Тема">🌙</button>
+    <button class="cta-top">⚡ Экспериментировать</button>
+  </div></header>
+  <div class="wrap"><div class="hero-content">
+    <div class="eyebrow">Лаборатория Forit Tech</div>
+    <h1>Твои данные.<br><span class="g">Твои правила.</span></h1>
+    <p>Forit Lab — единое пространство для работы с данными, API и текстом. Добывай, исследуй, создавай, сравнивай и ломай — безопасно, быстро и в одном месте.</p>
+    <div class="hero-cta">
+      <button class="btn primary" onclick="location.href='/#finder'">Начать эксперимент →</button>
+      <button class="btn ghost" onclick="location.href='#tools'">Как это работает?</button>
+    </div>
+    <blockquote class="hero-quote">
+      <span class="mk">“</span>
+      Эксперименты сегодня — лучшие решения завтра.
+      <cite>— Forit Tech</cite>
+    </blockquote>
+  </div></div>
+</section>
+
+<div class="wrap">
+  <section class="sec" id="tools">
+    <div class="sec-head">
+      <div><h2>Инструменты лаборатории</h2><div class="sub">Выбери инструмент и начни эксперимент</div></div>
+      <a href="/docs" target="_blank">Смотреть документацию →</a>
+    </div>
+    <div class="tools" id="toolgrid"></div>
+  </section>
+</div>
+
+<section class="cta" id="cta">
+  <div class="wrap">
+    <div class="cta-content">
+      <h3>Готов к экспериментам?</h3>
+      <p class="lead">Forit Lab — набор рабочих инструментов Forit Tech. Используй, улучшай, предлагай идеи или просто исследуй.</p>
+      <div class="cbtns">
+        <button class="btn ghost">⌥ Посмотреть на GitHub</button>
+        <button class="btn primary">💡 Предложить идею</button>
+      </div>
+      <div class="props">
+        <div class="prop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg></div><b>Open Source</b><small>Развиваем вместе</small></div>
+        <div class="prop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6 2 12l6 6M16 6l6 6-6 6"/></svg></div><b>For Developers</b><small>От инженеров для инженеров</small></div>
+        <div class="prop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12c1 1 1 2 1 3h6c0-1 0-2 1-3a7 7 0 0 0-4-12z"/></svg></div><b>Real Projects</b><small>Идеи, которые можно реализовать</small></div>
+      </div>
+    </div>
+    <div class="safe"></div>
+  </div>
+  <footer class="foot"><div class="wrap">
+    <span class="fx"><img src="/brand/logo-fox.png" alt=""><b>FORIT TECH <i>| LAB</i></b> <span style="color:var(--faint)">v0.1.0</span></span>
+    <span class="mid">экспериментируй · исследуй · создавай · улучшай</span>
+    <span>Сделано с ♥ для тех, кто любит данные</span>
+  </div></footer>
+</section>
+
+<script src="/variants/motifs.js"></script>
+<script>
+const grid=document.getElementById('toolgrid');
+TOOLS.forEach((t,i)=>{
+  const c=document.createElement('div');c.className='tcard';c.style.setProperty('--tacc',t.accent);
+  c.innerHTML=`<div class="art"><span class="num">0${i+1}</span><img src="/brand/tools/${t.id}.png" alt="${t.name}" loading="lazy"></div>
+    <div class="body"><h3>${t.name}</h3><p>${t.short}</p>
+    <div class="tagrow">${t.tags.map(x=>`<span class="tg">${x}</span>`).join('')}</div>
+    <button class="go" onclick="location.href='${t.href}'">Перейти →</button></div>`;
+  grid.append(c);
+});
+</script>
+</body>
+</html>

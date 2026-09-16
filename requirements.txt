@@ -1,0 +1,10 @@
+# Прод-зависимости для shared hosting (Passenger + WSGI).
+# Намеренно без pandas/numpy/scipy: вся статистика на стандартной библиотеке.
+fastapi==0.141.1
+# Мост ASGI -> WSGI: Passenger умеет только WSGI.
+a2wsgi==1.10.10
+# Нужен FastAPI для multipart-загрузки файлов (POST /api/drift/reports).
+python-multipart==0.0.20
+
+# Ставятся транзитивно вместе с fastapi, перечислены для прозрачности:
+#   starlette, pydantic, pydantic-core, annotated-types, typing-extensions

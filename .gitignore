@@ -1,0 +1,23 @@
+# Виртуальные окружения
+.venv/
+.venv*/
+venv/
+
+# Байткод и кеши
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Состояние приложения: сохранённые отчёты
+var/
+tmp/
+
+# Локальные настройки и артефакты
+.env
+*.log
+.DS_Store
+.idea/
+.vscode/
+DEPLOY.md

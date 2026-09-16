@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forit Lab — вариант B · Schematic</title>
+<link rel="icon" href="/brand/forit-tech-logo.png">
+<style>
+:root{
+  --bg:#080a0f; --panel:#0d1017; --panel2:#11151d; --border:#1d2430; --border-hi:#2c3a4d;
+  --text:#e8edf4; --dim:#8b97a8; --faint:#5a6575;
+  --violet:#8b5cf6; --violet-lt:#a78bfa; --orange:#fb923c; --amber:#f59e0b; --cyan:#38bdf8;
+  --m1:var(--cyan); --m2:var(--orange);
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.5;
+  background-image:linear-gradient(rgba(56,189,248,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.04) 1px,transparent 1px);
+  background-size:26px 26px;background-position:center;}
+a{color:var(--cyan);text-decoration:none}
+
+.vbar{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;font-size:.8rem;
+  background:#06080c;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30}
+.vbar b{color:var(--dim);margin-right:4px;font-family:var(--mono)}
+.vbar a{padding:4px 12px;border:1px solid var(--border);border-radius:5px;color:var(--dim);font-family:var(--mono);font-size:.78rem}
+.vbar a.on{background:var(--orange);color:#111;border-color:var(--orange)}
+
+header{display:flex;align-items:center;gap:14px;padding:16px clamp(16px,5vw,56px);border-bottom:1px solid var(--border);background:#06080c}
+.mark{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,var(--violet),var(--orange));display:grid;place-items:center;box-shadow:0 0 22px rgba(251,146,60,.25)}
+.mark svg{width:22px;height:22px}
+.wordmark .t{font-family:var(--mono);font-weight:700;letter-spacing:.2em;font-size:.72rem;color:var(--dim)}
+.wordmark .l{font-weight:800;font-size:1.1rem;letter-spacing:.04em}
+.wordmark .l b{background:linear-gradient(90deg,var(--violet-lt),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+header nav{margin-left:auto;display:flex;gap:2px;flex-wrap:wrap}
+header nav a{color:var(--dim);padding:6px 11px;border-radius:6px;font-size:.85rem;font-family:var(--mono)}
+header nav a:hover{background:var(--panel2);color:var(--text)}
+
+main{max-width:1180px;margin:0 auto;padding:0 clamp(16px,5vw,56px) 80px}
+
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;padding:48px 0 30px;border-bottom:1px dashed var(--border)}
+@media(max-width:820px){.hero{grid-template-columns:1fr}}
+.coord{font-family:var(--mono);font-size:.72rem;color:var(--faint);letter-spacing:.05em;margin-bottom:16px}
+.coord .on{color:var(--orange)}
+.hero h1{font-size:clamp(2rem,5vw,3rem);margin:0 0 14px;letter-spacing:-.02em;font-weight:800;line-height:1.05}
+.hero h1 em{font-style:normal;color:var(--cyan)}
+.hero p{color:var(--dim);font-size:1.05rem;max-width:520px;margin:0 0 22px}
+.specs{display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);font-size:.78rem}
+.specs div{color:var(--faint)} .specs b{color:var(--text);display:block;font-size:1.3rem;font-weight:700}
+
+.schematic{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:16px;position:relative}
+.schematic .lbl{position:absolute;top:-9px;left:14px;background:var(--panel);padding:0 8px;font-family:var(--mono);font-size:.68rem;color:var(--faint)}
+.pipe{display:flex;flex-direction:column;gap:2px}
+.prow{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:6px;transition:.15s;position:relative}
+.prow:hover{background:var(--panel2)}
+.prow .n{font-family:var(--mono);font-size:.68rem;color:var(--orange);width:22px}
+.prow .ic{width:34px;height:34px;border:1px solid var(--border-hi);border-radius:7px;display:grid;place-items:center;flex:0 0 auto}
+.prow .ic svg{width:24px;height:24px}
+.prow .tx{font-size:.92rem}
+.prow:not(:last-child) .ic::after{content:"";position:absolute;left:41px;margin-top:34px;width:1px;height:11px;background:var(--border-hi)}
+
+.section-t{display:flex;align-items:baseline;gap:12px;margin:44px 0 18px;font-family:var(--mono)}
+.section-t h2{font-size:1.1rem;margin:0;font-weight:700;letter-spacing:.02em}
+.section-t .line{flex:1;border-top:1px dashed var(--border)}
+.section-t .tag{font-size:.72rem;color:var(--faint)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.card{border:1px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden;transition:.18s;display:flex;flex-direction:column}
+.card:hover{border-color:var(--border-hi);background:var(--panel2)}
+.card .top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+.card .top .id{color:var(--orange)}
+.card .preview{height:118px;background:repeating-linear-gradient(0deg,transparent,transparent 12px,rgba(56,189,248,.03) 12px,rgba(56,189,248,.03) 13px);display:grid;place-items:center;border-bottom:1px solid var(--border)}
+.card .preview .motif{width:100%;height:100%}
+.card .body{padding:14px}
+.card h3{margin:0 0 5px;font-size:1.12rem}
+.card p{margin:0 0 12px;color:var(--dim);font-size:.9rem}
+.card .go{font-family:var(--mono);font-size:.82rem;color:var(--cyan)}
+.card .go::after{content:" ▸"}
+
+.motif .mdim{stroke:rgba(139,151,168,.4)}
+.motif .mln{stroke:var(--m1)} .motif .mln2{stroke:var(--m2)}
+.motif .mfl{fill:var(--m1)} .motif .mfl2{fill:var(--m2)}
+.motif .mpanel{fill:rgba(56,189,248,.04);stroke:var(--border-hi);stroke-width:1}
+.motif .mhub{fill:var(--cyan)}
+.motif .mnode circle{fill:rgba(56,189,248,.45)}
+.motif .mburn rect{fill:rgba(251,146,60,.16);stroke:var(--orange);stroke-width:1}
+.motif .mtxt{fill:var(--orange)} .motif .mtxt2{fill:var(--faint)}
+.motif .mtxt-strong{fill:var(--text)} .motif .mfl2-text{fill:var(--orange)}
+.motif .mghost{fill:rgba(251,146,60,.08);stroke:var(--orange);stroke-width:1.2}
+.motif .mchip-ok{fill:rgba(63,185,80,.14);stroke:rgba(63,185,80,.55)}
+.motif .mchip-warn{fill:rgba(245,158,11,.14);stroke:rgba(245,158,11,.55)}
+.motif .mchip-alert{fill:rgba(248,81,73,.14);stroke:rgba(248,81,73,.55)}
+
+footer{font-family:var(--mono);text-align:center;padding:34px;color:var(--faint);font-size:.78rem;border-top:1px solid var(--border);margin-top:40px}
+
+.brandimg{width:42px;height:42px;border-radius:11px;object-fit:cover;display:none;box-shadow:0 0 26px rgba(251,146,60,.3)}
+body.has-logo .brandimg{display:block}
+body.has-logo .mark{display:none}
+</style>
+</head>
+<body>
+<div class="vbar"><b>[ вариант ]</b>
+  <a href="/variants/a.html">A · Node Lab</a>
+  <a class="on" href="/variants/b.html">B · Schematic</a>
+  <a href="/variants/c.html">C · Signal</a>
+  <a href="/variants/">← все</a>
+</div>
+
+<header>
+  <img src="/brand/forit-tech-logo.png" alt="Forit Tech" class="brandimg" onload="document.body.classList.add('has-logo')" onerror="this.remove()">
+  <div class="mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+      <path d="M10 6.5h4a3.5 3.5 0 0 1 3.5 3.5v4"/>
+    </svg>
+  </div>
+  <div class="wordmark"><div class="t">FORIT TECH</div><div class="l">/ <b>LAB</b></div></div>
+  <nav id="nav"></nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div>
+      <div class="coord">SYS://forit.tech/<span class="on">lab</span> · data-engineering workspace · v0.2</div>
+      <h1>Лаборатория<br><em>данных и API</em></h1>
+      <p>Добыть, создать, испортить, исследовать, сравнить, сломать. Шесть инструментов, соединённых в один конвейер обработки данных.</p>
+      <div class="specs">
+        <div><b>6</b>инструментов</div>
+        <div><b>0</b>тяжёлых зависимостей</div>
+        <div><b>176</b>тестов</div>
+      </div>
+    </div>
+    <div class="schematic">
+      <span class="lbl">// data pipeline</span>
+      <div class="pipe" id="pipe"></div>
+    </div>
+  </section>
+
+  <div class="section-t"><h2>// модули</h2><div class="line"></div><span class="tag">one design system</span></div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer>FORIT_TECH / LAB · stdlib-only · host-0 ready · 2026</footer>
+
+<script src="/variants/motifs.js"></script>
+<script>
+const nav=document.getElementById('nav');
+TOOLS.forEach(t=>{const a=document.createElement('a');a.href=t.href;a.textContent=t.name;nav.append(a);});
+const pipe=document.getElementById('pipe');
+PIPELINE.forEach((p,i)=>{
+  const el=document.createElement('div');el.className='prow';
+  el.innerHTML=`<span class="n">0${i+1}</span><div class="ic">${MOTIFS[p.k].replace('viewBox="0 0 320 130"','viewBox="60 10 200 110"')}</div><span class="tx">${p.t}</span>`;
+  pipe.append(el);
+});
+const grid=document.getElementById('grid');
+TOOLS.forEach((t,i)=>{
+  const c=document.createElement('a');c.className='card';c.href=t.href;
+  c.innerHTML=`<div class="top"><span>MOD.0${i+1}</span><span class="id">● online</span></div>
+    <div class="preview">${MOTIFS[t.id]}</div>
+    <div class="body"><h3>${t.name}</h3><p>${t.tag}</p><span class="go">${t.verb}</span></div>`;
+  grid.append(c);
+});
+</script>
+</body>
+</html>
