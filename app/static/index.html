@@ -2,7 +2,11 @@
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050406">
+  <meta name="color-scheme" content="dark">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" href="/brand/logo-fox.png">
   <title>Forit Lab — лаборатория данных FORIT TECH</title>
   <meta name="description" content="Единая лаборатория для работы с данными, API и текстом: добыть, создать, исследовать, сравнить и сломать — безопасно, быстро и в одном месте.">
   <link rel="icon" href="/brand/logo-fox.png">
@@ -14,7 +18,10 @@
       <img src="/brand/logo-fox.png" alt="FORIT TECH">
       <span class="wm"><b>FORIT TECH</b><span class="sep">|</span><span class="lab">LAB</span></span>
     </button>
-    <nav id="nav">
+    <button class="nav-toggle" id="navToggle" type="button" aria-controls="nav" aria-expanded="false" aria-label="Открыть меню">
+      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+    <nav id="nav" aria-label="Разделы">
       <button data-nav="home">Главная</button>
       <button data-nav="harvester">Harvester</button>
       <button data-nav="finder">API Finder</button>
@@ -24,6 +31,7 @@
       <button data-nav="chaos">Chaos</button>
     </nav>
   </div></header>
+  <div class="nav-scrim" id="navScrim" aria-hidden="true"></div>
 
   <main>
     <!-- ГЛАВНАЯ -->
@@ -82,6 +90,7 @@
 
     <!-- КАК ЭТО РАБОТАЕТ / О ПРОЕКТЕ -->
     <section class="view" id="view-about">
+      <div class="back-row"><button class="back-link" type="button" data-back>← Назад</button></div>
       <div class="tool-hero" style="--tacc:#fb7132">
         <div class="th-num">?</div>
         <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .8-1 1.7M12 17h.01"/></svg></div>
@@ -146,7 +155,7 @@
             <label>Что ищешь? Можно словами: «погода», «курсы валют», «датасет для DS»</label>
             <input type="text" id="afQuery" placeholder="погода">
           </div>
-          <div class="field" style="flex:0 0 auto; display:flex; align-items:end; gap:8px;">
+          <div class="field field-actions">
             <button class="btn" id="afSearch">Искать</button>
             <button class="btn ghost" id="afSurprise" title="Связка API + идея проекта">🎲 Surprise me</button>
           </div>
@@ -157,7 +166,7 @@
           <label class="toggle"><input type="checkbox" id="afOpenData"> Open data</label>
           <label class="toggle"><input type="checkbox" id="afFreeTier"> Free tier</label>
           <label class="toggle"><input type="checkbox" id="afCors"> CORS</label>
-          <span style="margin-left:auto"><button class="btn ghost sm" id="afReset">↺ Сбросить</button>
+          <span class="tr-actions"><button class="btn ghost sm" id="afReset">↺ Сбросить</button>
           <button class="btn ghost sm" id="afExplore">💡 Explore</button>
           <button class="btn ghost sm" id="afFav">★ Favorites (<span id="afFavCount">0</span>)</button></span>
         </div>

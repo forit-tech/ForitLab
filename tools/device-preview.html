@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forit Lab — Device Preview</title>
+<!--
+  Локальный предпросмотр Forit Lab на телефонах и планшетах: живые iframe с реальными ширинами,
+  медиазапросы срабатывают по-настоящему, всё кликается.
+  Запуск: поднять сервер (uvicorn app.main:app --port 8000) и открыть этот файл в браузере.
+  Адрес сервера можно сменить полем «сервер» или параметром ?base=http://host:port
+  Файл лежит в tools/ и на хостинг не попадает.
+-->
+<style>
+  :root{--bg:#07050a;--panel:#120c11;--border:#2a1f28;--text:#f4ede7;--dim:#b3a4aa;--faint:#6d5e66;--ember:#fb7132;--ember-lt:#ffa14a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background-image:radial-gradient(900px 500px at 90% -10%,rgba(251,113,50,.12),transparent 60%)}
+  header{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 18px;
+    background:rgba(10,7,10,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+  h1{margin:0 8px 0 0;font-size:15px;font-weight:800;letter-spacing:.02em}
+  h1 b{background:linear-gradient(95deg,#f5b53c,#fb7132 45%,#e05fd6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .grp{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+  .grp span{color:var(--faint);font-size:12px;margin-right:4px}
+  button,select,input{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer}
+  input{cursor:text;width:190px}
+  button.on{border-color:var(--ember);background:rgba(251,113,50,.16);color:var(--ember-lt)}
+  button:hover{border-color:#3d2a35}
+  main{display:flex;flex-wrap:wrap;gap:34px 30px;align-items:flex-start;padding:26px 18px 60px}
+  .dev{display:flex;flex-direction:column;gap:8px}
+  .cap{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--dim)}
+  .cap b{color:var(--text)} .cap a{color:var(--ember-lt);text-decoration:none}
+  .shell{position:relative;overflow:hidden;background:#000;border:1px solid #3a2c35;
+    box-shadow:0 0 0 8px #151015,0 0 0 9px #2d2229,0 24px 60px rgba(0,0,0,.6)}
+  .dev.phone .shell{border-radius:calc(46px * var(--s))}
+  .dev.tablet .shell{border-radius:calc(26px * var(--s))}
+  .dev.desk .shell{border-radius:10px}
+  .shell iframe{border:0;display:block;transform-origin:0 0;background:#050406}
+  /* статус-бар телефона: в Safari (portrait) страница начинается под ним, как и здесь */
+  .sb{position:relative;display:flex;align-items:center;justify-content:space-between;background:#000;color:#fff;
+    font-weight:600;font-size:calc(15px * var(--s));padding:0 calc(28px * var(--s))}
+  .sb i{font-style:normal;letter-spacing:.06em;font-size:calc(12px * var(--s))}
+  .dev.island .sb::after{content:"";position:absolute;top:calc(11px * var(--s));left:50%;transform:translateX(-50%);
+    width:calc(120px * var(--s));height:calc(34px * var(--s));border-radius:99px;background:#1a1a1a}
+  .note{color:var(--faint);font-size:12px;padding:0 18px;max-width:1100px}
+  .note code{color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1><b>FORIT LAB</b> · device preview</h1>
+  <div class="grp" id="pages"><span>страница</span></div>
+  <div class="grp" id="sets"><span>устройства</span></div>
+  <div class="grp"><span>масштаб</span>
+    <select id="scale"><option value="0.5">50%</option><option value="0.66" selected>66%</option><option value="0.8">80%</option><option value="1">100%</option></select>
+  </div>
+  <div class="grp"><span>сервер</span><input id="base" spellcheck="false"></div>
+  <div class="grp"><button id="reload" title="Перезагрузить все фреймы">↻</button></div>
+</header>
+<p class="note">Живые iframe реальной ширины: медиазапросы, меню, формы — всё настоящее, можно кликать. Статус-бар и Dynamic Island нарисованы для наглядности; <code>env(safe-area-inset-*)</code> в iframe равен 0, поэтому вырезы (landscape, режим «На экран Домой») проверяй на реальном iPhone.</p>
+<main id="grid"></main>
+<script>
+const DEVICES = [
+  { id: "se1", name: "iPhone SE (1st)", w: 320, h: 568, kind: "phone" },
+  { id: "se", name: "iPhone SE / 8", w: 375, h: 667, kind: "phone" },
+  { id: "i14", name: "iPhone 14", w: 390, h: 844, kind: "phone", island: true },
+  { id: "i15", name: "iPhone 15 Pro", w: 393, h: 852, kind: "phone", island: true },
+  { id: "max", name: "iPhone Pro Max", w: 430, h: 932, kind: "phone", island: true },
+  { id: "pixel", name: "Android (Pixel 7)", w: 412, h: 915, kind: "phone" },
+  { id: "land", name: "iPhone 15 Pro — боком", w: 852, h: 393, kind: "phone", sb: 0 },
+  { id: "mini", name: "iPad mini", w: 768, h: 1024, kind: "tablet" },
+  { id: "air", name: "iPad Air", w: 820, h: 1180, kind: "tablet" },
+  { id: "pro", name: "iPad Pro 12.9″", w: 1024, h: 1366, kind: "tablet" },
+  { id: "airL", name: "iPad Air — landscape", w: 1180, h: 820, kind: "tablet" },
+  { id: "laptop", name: "Laptop", w: 1366, h: 768, kind: "desk" },
+  { id: "fhd", name: "Desktop FHD", w: 1920, h: 1080, kind: "desk" },
+];
+const SETS = {
+  "Телефоны": ["se1", "se", "i14", "i15", "max", "pixel"],
+  "Планшеты": ["mini", "air", "pro", "airL"],
+  "iPhone": ["se", "i15", "max", "land"],
+  "Всё": DEVICES.map((d) => d.id),
+  "Десктоп": ["laptop", "fhd"],
+};
+const PAGES = [["home", "Главная"], ["about", "Как это работает"], ["harvester", "Harvester"], ["finder", "API Finder"],
+  ["burner", "Burner"], ["drift", "Drift"], ["unicode", "Unicode"], ["chaos", "Chaos"]];
+
+const qs = new URLSearchParams(location.search);
+const state = {
+  base: qs.get("base") || localGet("fp-base") || "http://127.0.0.1:8000",
+  page: qs.get("page") || "home",
+  set: qs.get("set") || "Телефоны",
+  scale: parseFloat(qs.get("scale") || "0.66"),
+};
+function localGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function localSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+const $ = (s) => document.querySelector(s);
+function buttons(box, items, current, onPick) {
+  box.querySelectorAll("button").forEach((b) => b.remove());
+  items.forEach(([val, label]) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.className = val === current ? "on" : "";
+    b.onclick = () => onPick(val);
+    box.append(b);
+  });
+}
+// высота статус-бара в CSS-пикселях: 47 у iPhone с островом, 20 у старых, 24 у Android
+function sbh(d) { return d.kind !== "phone" ? 0 : d.sb ?? (d.island ? 47 : d.id === "pixel" ? 24 : 20); }
+function statusBar(d, s) {
+  const h = sbh(d);
+  return h ? `<div class="sb" style="height:${h * s}px"><span>9:41</span><i>5G ▮▮▮</i></div>` : "";
+}
+function syncUrl() {
+  const p = new URLSearchParams({ page: state.page, set: state.set, scale: state.scale });
+  history.replaceState(null, "", "?" + p.toString());
+}
+function render() {
+  buttons($("#pages"), PAGES, state.page, (v) => { state.page = v; render(); });
+  buttons($("#sets"), Object.keys(SETS).map((k) => [k, k]), state.set, (v) => { state.set = v; render(); });
+  $("#scale").value = String(state.scale);
+  $("#base").value = state.base;
+  const grid = $("#grid");
+  grid.replaceChildren();
+  const s = state.scale;
+  SETS[state.set].map((id) => DEVICES.find((d) => d.id === id)).forEach((d) => {
+    const url = `${state.base.replace(/\/$/, "")}/#${state.page}`;
+    const dev = document.createElement("div");
+    dev.className = `dev ${d.kind}${d.island ? " island" : ""}`;
+    dev.style.setProperty("--s", s);
+    dev.innerHTML =
+      `<div class="cap"><span><b>${d.name}</b> · ${d.w}×${d.h}</span><a href="${url}" target="_blank" rel="noopener">открыть ↗</a></div>` +
+      `<div class="shell" style="width:${Math.round(d.w * s)}px;height:${Math.round(d.h * s)}px">` + statusBar(d, s) +
+      `<iframe title="${d.name}" src="${url}" width="${d.w}" height="${d.h - sbh(d)}" style="transform:scale(${s})" loading="lazy"></iframe></div>`;
+    grid.append(dev);
+  });
+  syncUrl();
+}
+$("#scale").onchange = (e) => { state.scale = parseFloat(e.target.value); render(); };
+$("#base").onchange = (e) => { state.base = e.target.value.trim() || "http://127.0.0.1:8000"; localSet("fp-base", state.base); render(); };
+$("#reload").onclick = render;
+render();
+</script>
+</body>
+</html>

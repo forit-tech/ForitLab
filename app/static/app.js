@@ -90,10 +90,14 @@ const MARK = { ok: "✓", info: "·", warn: "⚠", alert: "✕" };
 
 // ---------- роутинг ----------
 const VIEWS = ["home", "about", "harvester", "finder", "burner", "drift", "unicode", "chaos"];
+let currentView = null, prevView = null;
 function navigate(view) {
   if (!VIEWS.includes(view)) view = "home";
+  // navigate срабатывает дважды (клик + hashchange) — запоминаем предыдущую вью только при реальной смене
+  if (view !== currentView) { prevView = currentView; currentView = view; }
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
   $$("#nav button[data-nav]").forEach((b) => b.classList.toggle("active", b.dataset.nav === view));
+  setMenu(false);
   if (location.hash !== `#${view}`) location.hash = view;
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (view === "home") initHome();
@@ -105,9 +109,28 @@ function navigate(view) {
 }
 window.addEventListener("hashchange", () => navigate(location.hash.slice(1)));
 document.addEventListener("click", (e) => {
+  // «← Назад»: туда, откуда пришли; если страницу открыли прямой ссылкой — на главную
+  if (e.target.closest("[data-back]")) { e.preventDefault(); navigate(prevView && prevView !== currentView ? prevView : "home"); return; }
   const nav = e.target.closest("[data-nav]");
   if (nav) { e.preventDefault(); navigate(nav.dataset.nav); }
 });
+
+// ---------- мобильное меню ----------
+// На узких экранах (см. breakpoint в styles.css) #nav превращается в выпадающую панель под хедером.
+function setMenu(open) {
+  const btn = $("#navToggle");
+  if (!btn) return;
+  document.documentElement.classList.toggle("nav-open", open);
+  btn.setAttribute("aria-expanded", String(open));
+  btn.setAttribute("aria-label", open ? "Закрыть меню" : "Открыть меню");
+}
+$("#navToggle").addEventListener("click", () => setMenu(!document.documentElement.classList.contains("nav-open")));
+$("#navScrim").addEventListener("click", () => setMenu(false));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.documentElement.classList.contains("nav-open")) { setMenu(false); $("#navToggle").focus(); }
+});
+// повернули планшет / расширили окно до десктопа — меню не должно остаться «открытым» с заблокированным скроллом
+matchMedia("(min-width: 1100px)").addEventListener("change", (e) => { if (e.matches) setMenu(false); });
 
 // ---------- тема ----------
 // Ember — тёмный дизайн, тема фиксирована на dark (переключателя нет).
@@ -164,10 +187,10 @@ function initAbout() {
       `<span class="mono" style="color:var(--tacc)">0${i + 1}</span> ${esc(t.name)}</div>` +
       `<button class="act" data-nav="${t.id}">Открыть →</button></div>` +
       `<div class="rb-body">` +
-      `<dl class="kv" style="grid-template-columns:auto 1fr;gap:10px 18px">` +
-      `<dt class="muted">Что делает</dt><dd style="margin:0">${esc(t.what)}</dd>` +
-      `<dt class="muted">Зачем</dt><dd style="margin:0">${esc(t.why)}</dd>` +
-      `<dt class="muted">Пример</dt><dd style="margin:0;color:var(--dim)">${esc(t.example)}</dd>` +
+      `<dl class="kv kv-wide">` +
+      `<dt class="muted">Что делает</dt><dd>${esc(t.what)}</dd>` +
+      `<dt class="muted">Зачем</dt><dd>${esc(t.why)}</dd>` +
+      `<dt class="muted">Пример</dt><dd style="color:var(--dim)">${esc(t.example)}</dd>` +
       `</dl></div>`;
     box.append(b);
   });
@@ -325,8 +348,8 @@ function renderHarvest(d, url) {
     const rows = [["Заголовок", m.title], ["Описание", m.description], ["Canonical", m.canonical], ["Язык", m.lang]].filter(([, v]) => v);
     if (rows.length) {
       const { block, body } = rblock(rbTitle("Метаданные"), { accent: "#3b82f6" });
-      body.append(el("dl", { class: "kv", style: "grid-template-columns:auto 1fr;gap:8px 18px" },
-        ...rows.flatMap(([k, v]) => [el("dt", { class: "muted" }, k), el("dd", { style: "margin:0;word-break:break-word" }, esc(v))])));
+      body.append(el("dl", { class: "kv kv-wide" },
+        ...rows.flatMap(([k, v]) => [el("dt", { class: "muted" }, k), el("dd", {}, esc(v))])));
       wrap.append(block);
     }
   }
@@ -488,7 +511,7 @@ async function runFavorites() {
   if (!fav.length) { render(out, State.empty("В избранном пусто. Жми ★ на карточках.")); return; }
   await withState(out, "Загружаем избранное…", async () => {
     const d = await api("/api/apifinder/favorites/export?ids=" + encodeURIComponent(fav.join(",")));
-    const head = el("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px" },
+    const head = el("div", { class: "list-head" },
       el("div", { class: "muted" }, `В избранном: ${d.count}`),
       el("a", { class: "btn sm", href: "/api/apifinder/favorites/export?format=csv&ids=" + encodeURIComponent(fav.join(",")), target: "_blank" }, "↓ Экспорт CSV"));
     return el("div", {}, head, el("div", { class: "result-cards" }, ...d.favorites.map(apiCard)));
@@ -656,16 +679,16 @@ function renderDrift(rep) {
   const drifting = (rep.columns || []).filter((c) => c.metrics && c.metrics.psi != null);
   if (drifting.length) {
     drifting.sort((a, b) => (b.metrics.psi || 0) - (a.metrics.psi || 0));
-    const tbl = el("table", { class: "data" }, el("thead", {}, el("tr", {},
+    const tbl = el("table", { class: "data stack" }, el("thead", {}, el("tr", {},
       el("th", {}, "Колонка"), el("th", {}, "Анализ"), el("th", { class: "num" }, "PSI"), el("th", { class: "num" }, "KS"), el("th", {}, "Статус"))));
     const tb = el("tbody", {});
     drifting.forEach((c) => tb.append(el("tr", {},
-      el("td", {}, c.column), el("td", { class: "muted" }, c.analysis),
-      el("td", { class: "num" }, (c.metrics.psi ?? "").toString()),
-      el("td", { class: "num" }, c.metrics.ks_statistic != null ? c.metrics.ks_statistic : "—"),
-      el("td", {}, sevBadge(c.status)))));
+      el("td", { class: "st-title" }, c.column), el("td", { class: "muted", "data-label": "Анализ" }, c.analysis),
+      el("td", { class: "num", "data-label": "PSI" }, (c.metrics.psi ?? "").toString()),
+      el("td", { class: "num", "data-label": "KS" }, c.metrics.ks_statistic != null ? c.metrics.ks_statistic : "—"),
+      el("td", { "data-label": "Статус" }, sevBadge(c.status)))));
     tbl.append(tb);
-    wrap.append(el("div", { class: "panel" }, el("h3", {}, "Распределения"), el("div", { class: "table-wrap" }, tbl)));
+    wrap.append(el("div", { class: "panel" }, el("h3", {}, "Распределения"), el("div", { class: "table-wrap stack-wrap" }, tbl)));
   }
 
   // все находки

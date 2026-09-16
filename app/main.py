@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import mimetypes
+import re
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -15,10 +17,11 @@ from fastapi import FastAPI
 # чтобы StaticFiles отдавал image/webp, а не application/octet-stream.
 mimetypes.add_type("image/webp", ".webp")
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+VERSIONED_ASSETS = ("styles.css", "app.js")
 
 from . import __service__, __version__
 from .config import settings
@@ -92,15 +95,35 @@ def create_app() -> FastAPI:
     # Веб-интерфейс. Отдаём одностраничное приложение из app/static.
     # API-роуты уже подключены выше, так что StaticFiles на корне их не затеняет.
     if STATIC_DIR.exists():
-        index_file = STATIC_DIR / "index.html"
+        index_html = versioned_index(STATIC_DIR)
 
         @app.get("/", include_in_schema=False)
-        async def home() -> FileResponse:
-            return FileResponse(index_file)
+        async def home() -> HTMLResponse:
+            # сам HTML всегда перепроверяется, а CSS/JS кэшируются по версионированному URL
+            return HTMLResponse(index_html, headers={"Cache-Control": "no-cache"})
 
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
     return app
+
+
+def asset_version(static_dir: Path) -> str:
+    """Версия приложения + короткий хеш CSS/JS: кэш сбрасывается и при деплое без поднятия версии."""
+    digest = hashlib.sha256()
+    for name in VERSIONED_ASSETS:
+        path = static_dir / name
+        if path.exists():
+            digest.update(path.read_bytes())
+    return f"{__version__}-{digest.hexdigest()[:8]}"
+
+
+def versioned_index(static_dir: Path) -> str:
+    """index.html со ссылками вида /styles.css?v=<версия> — без сборки, один раз при старте приложения."""
+    html = (static_dir / "index.html").read_text(encoding="utf-8")
+    version = asset_version(static_dir)
+    for name in VERSIONED_ASSETS:
+        html = re.sub(rf'((?:href|src)="/{re.escape(name)})(?:\?v=[^"]*)?"', rf'\1?v={version}"', html)
+    return html
 
 
 app = create_app()
