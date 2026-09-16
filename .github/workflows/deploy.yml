@@ -1,0 +1,44 @@
+name: Deploy Forit Lab
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: foritlab-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/foritlab_deploy
+          chmod 600 ~/.ssh/foritlab_deploy
+
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh \
+            -i ~/.ssh/foritlab_deploy \
+            -o BatchMode=yes \
+            u3649799@"$DEPLOY_HOST"
