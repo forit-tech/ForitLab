@@ -39,9 +39,11 @@ def _get_executor():
     if _executor is None:
         from ...exec import build_default_executor
         from ...parser.collect import KIND as COLLECT_KIND, CollectHandler
+        from ...parser.crawl_audit import KIND as CRAWL_KIND, CrawlHandler
 
         _executor = build_default_executor()
         _executor.register(COLLECT_KIND, CollectHandler())
+        _executor.register(CRAWL_KIND, CrawlHandler())
     return _executor
 
 
@@ -382,18 +384,67 @@ def collect_status(job_id: str) -> dict:
     return _get_executor().status(job_id).to_public()
 
 
-@router.get("/collect/{job_id}/export", response_class=PlainTextResponse, summary="Экспорт собранного датасета")
-def collect_export(job_id: str, format: str = Query(default="csv", pattern="^(csv|json|jsonl|manifest)$")) -> Response:
-    from ...exec import build_default_executor  # noqa: F401  (гарантируем каталог)
+def _export_job(job_id: str, format: str, prefix: str) -> Response:
     from ...parser.results import ResultFile
 
     ex = _get_executor()
     state = ex.status(job_id)  # бросит NotFound, если джобы нет
-    result = ResultFile(ex._store.directory, job_id)
-    rows = list(result.read())
+    rows = list(ResultFile(ex._store.directory, job_id).read())
     columns = (state.internal_state.get("columns") if state.internal_state else None) or (list(rows[0].keys()) if rows else [])
     if format == "manifest":
         assets = [{"row": i, "url": v} for i, r in enumerate(rows) for v in r.values() if isinstance(v, str) and v.startswith(("http://", "https://"))]
-        return _download(json.dumps(assets, ensure_ascii=False, indent=2), "application/json", f"collect-{job_id}-manifest.json")
+        return _download(json.dumps(assets, ensure_ascii=False, indent=2), "application/json", f"{prefix}-{job_id}-manifest.json")
     body, media, _ = _serialize(columns, rows, format)
-    return _download(body, media, f"collect-{job_id}.{ 'jsonl' if format=='jsonl' else format }")
+    return _download(body, media, f"{prefix}-{job_id}.{'jsonl' if format == 'jsonl' else format}")
+
+
+@router.get("/collect/{job_id}/export", response_class=PlainTextResponse, summary="Экспорт собранного датасета")
+def collect_export(job_id: str, format: str = Query(default="csv", pattern="^(csv|json|jsonl|manifest)$")) -> Response:
+    return _export_job(job_id, format, "collect")
+
+
+# --------------------------------------------------------------------------
+# 1e — Crawl / Audit (тот же chunked-executor, kind=parser.crawl)
+# --------------------------------------------------------------------------
+class CrawlRequest(BaseModel):
+    input: str = Field(description="URL стартовой страницы")
+    max_pages: int | None = None
+    max_depth: int | None = None
+    allow_subdomains: bool = False
+    respect_robots: bool = True
+
+
+@router.post("/crawl", summary="Запустить обход сайта (1e)")
+def crawl_start(payload: CrawlRequest) -> dict:
+    from ...parser.crawl_audit import build_plan
+
+    options = {"max_pages": payload.max_pages, "max_depth": payload.max_depth,
+               "allow_subdomains": payload.allow_subdomains, "respect_robots": payload.respect_robots}
+    options = {k: v for k, v in options.items() if v is not None}
+    try:
+        plan = build_plan(payload.input, options)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    return _get_executor().start(plan).to_public()
+
+
+@router.post("/crawl/{job_id}/step", summary="Шаг обхода")
+def crawl_step(job_id: str, payload: StepRequest) -> dict:
+    from ...exec import StepBudget
+
+    return _get_executor().step(job_id, cursor=payload.cursor, budget=StepBudget(max_units=999, max_ms=9000)).to_public()
+
+
+@router.post("/crawl/{job_id}/cancel", summary="Остановить обход")
+def crawl_cancel(job_id: str) -> dict:
+    return _get_executor().cancel(job_id).to_public()
+
+
+@router.get("/crawl/{job_id}/status", summary="Статус обхода")
+def crawl_status(job_id: str) -> dict:
+    return _get_executor().status(job_id).to_public()
+
+
+@router.get("/crawl/{job_id}/export", response_class=PlainTextResponse, summary="Экспорт audit-таблицы")
+def crawl_export(job_id: str, format: str = Query(default="csv", pattern="^(csv|json|jsonl|manifest)$")) -> Response:
+    return _export_job(job_id, format, "crawl")

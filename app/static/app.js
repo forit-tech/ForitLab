@@ -983,8 +983,8 @@ $("#chTry").addEventListener("click", async () => {
 let parserReady = false;
 const PA_MODE_NOTE = {
   extract: "",
-  crawl: "Crawl — обход сайта (URL/статусы/редиректы/битые ссылки). Появится в субфазе 1e.",
-  audit: "Audit — массовый сбор тех-полей (title/description/H1/canonical…). Появится в субфазе 1e.",
+  crawl: "",
+  audit: "",
   explore: "",
 };
 let paMode = "explore";
@@ -1016,7 +1016,7 @@ function selectParserMode(mode) {
 // paGo диспетчеризует по активному режиму: Extract → сбор данных, Explore → разбор
 async function runParserGo() {
   if (paMode === "extract") return runParserExtract();
-  if (paMode === "crawl" || paMode === "audit") { toast("Этот режим появится в следующей субфазе", "error"); return; }
+  if (paMode === "crawl" || paMode === "audit") return runCrawl(paMode);
   return runParserExplore();
 }
 async function runParserInspect() {
@@ -1614,6 +1614,114 @@ function showChaosHandoff() {
     `<span class="mono" style="word-break:break-all">${esc(url)}</span>. ` +
     `Полноценная проверка сайта (Chaos Security Check) появится в отдельной фазе — сейчас доступен генератор плохих ответов ниже.</p></div>`;
   out.replaceChildren(note);
+}
+
+
+// =====================================================================
+// WEB PARSER · Crawl / Audit (1e): обход сайта → технические факты
+// =====================================================================
+let paCrawl = null;
+
+async function runCrawl(mode) {
+  const input = $("#paInput").value.trim();
+  const out = $("#paOut");
+  if (!input) { toast("Вставьте URL", "error"); return; }
+  if (!/^https?:\/\/\S+$/i.test(input)) { toast("Обход требует URL", "error"); return; }
+  paState.input = input;
+  out.replaceChildren(State.loading("Запускаем обход…"));
+  let start;
+  try {
+    start = await api("/api/parser/crawl", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input }) });
+  } catch (e) { render(out, State.error(e)); return; }
+  if (start.error) { render(out, State.error(new ApiError(start.error))); return; }
+  paCrawl = { job_id: start.id, cursor: start.cursor, mode, cancelled: false };
+  await pumpCrawl(out);
+}
+
+function crawlUI(out) {
+  const bar = window.ForitKit ? ForitKit.progressBar() : null;
+  const stat = el("div", { class: "chips", style: "margin:10px 0" });
+  const cancel = el("button", { class: "btn ghost sm", onclick: cancelCrawl }, "Отменить");
+  const { block } = rblock(rbTitle(paCrawl.mode === "audit" ? "Аудит сайта" : "Обход сайта"), { accent: "#22d3ee", actions: [cancel] });
+  const inner = block.querySelector(".rb-body");
+  if (bar) inner.append(bar);
+  inner.append(stat);
+  out.replaceChildren(block);
+  return { bar, stat, inner };
+}
+
+async function cancelCrawl() {
+  if (!paCrawl) return;
+  paCrawl.cancelled = true;
+  try { await api(`/api/parser/crawl/${paCrawl.job_id}/cancel`, { method: "POST" }); } catch {}
+  toast("Останавливаем…");
+}
+
+async function pumpCrawl(out) {
+  const ui = crawlUI(out);
+  const job = paCrawl;
+  while (true) {
+    let st;
+    try {
+      st = await api(`/api/parser/crawl/${job.job_id}/step`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cursor: job.cursor }),
+      });
+    } catch (e) { render(out, State.error(e)); return; }
+    job.cursor = st.cursor;
+    const p = st.partial || {};
+    if (ui.bar) { ui.bar.setProgress(st.progress || 0); ui.bar.setLabel(`${p.pages || 0} стр · ${p.broken || 0} broken`); }
+    ui.stat.replaceChildren(
+      el("span", { class: "chip active" }, `статус: ${st.status}`),
+      el("span", { class: "chip" }, `страниц: ${p.pages || 0}`),
+      el("span", { class: "chip" }, `broken: ${p.broken || 0}`),
+      el("span", { class: "chip" }, `redirects: ${p.redirects || 0}`),
+      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null);
+    if (["completed", "failed", "cancelled"].includes(st.status)) { await finishCrawl(ui.inner, st); return; }
+    await new Promise((r) => setTimeout(r, 120));
+  }
+}
+
+async function finishCrawl(inner, st) {
+  const p = st.partial || {};
+  let rows = p.sample || [];
+  try { rows = await api(`/api/parser/crawl/${paCrawl.job_id}/export?format=json`); } catch {}
+
+  if (p.stopped_reason) inner.append(finding(p.partial ? "warn" : "info", "", `Итог: ${p.stopped_reason}`));
+  inner.append(el("div", { class: "chips", style: "margin:6px 0" },
+    ...Object.entries(p.statuses || {}).map(([s, n]) => el("span", { class: `chip ${s >= "400" ? "" : "active"}` }, `${s}: ${n}`))));
+
+  // проблемы (для Audit — на первом плане)
+  const broken = rows.filter((r) => r.broken || r.error);
+  const noTitle = rows.filter((r) => !r.broken && !r.error && (r.content_type || "").includes("html") && !r.title);
+  if (broken.length || noTitle.length) {
+    const iss = rblock(rbTitle("Проблемы", broken.length + noTitle.length), { accent: "#f43f5e" });
+    broken.forEach((r) => iss.body.append(finding("alert", String(r.status || "—"), `${r.error || "недоступна"} · ${r.url}${r.source ? " ← " + r.source : ""}`)));
+    noTitle.forEach((r) => iss.body.append(finding("warn", "no title", r.url)));
+    inner.append(iss.block);
+  } else {
+    inner.append(finding("ok", "", "Битых ссылок и пустых title не найдено"));
+  }
+
+  // таблица страниц
+  const cols = ["status", "url", "title", "depth", "redirected"];
+  const table = el("table", { class: "dtable" });
+  table.append(el("thead", {}, el("tr", {}, ...cols.map((c) => el("th", {}, c)))));
+  const tb = el("tbody", {});
+  rows.slice(0, 200).forEach((r) => tb.append(el("tr", {},
+    el("td", { class: r.broken ? "" : "num", style: r.broken ? "color:var(--alert)" : "" }, String(r.status ?? "—")),
+    el("td", { title: r.url, style: "max-width:340px;overflow:hidden;text-overflow:ellipsis" }, esc(r.url)),
+    el("td", {}, esc(r.title || "")),
+    el("td", { class: "num" }, String(r.depth)),
+    el("td", {}, r.redirected ? "→ " + esc(r.final_url || "") : ""))));
+  table.append(tb);
+  inner.append(el("div", { class: "dtable-wrap" }, table));
+
+  // экспорт
+  const jid = paCrawl.job_id;
+  inner.append(el("div", { class: "row", style: "margin-top:12px" },
+    el("a", { class: "btn", href: `/api/parser/crawl/${jid}/export?format=csv`, target: "_blank" }, `↓ CSV (${rows.length})`),
+    el("a", { class: "btn ghost", href: `/api/parser/crawl/${jid}/export?format=json`, target: "_blank" }, "↓ JSON")));
+  if (st.status === "completed") toast(`Обойдено ${p.pages || 0} страниц`, "success");
 }
 
 // ---------- старт ----------
