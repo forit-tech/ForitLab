@@ -89,7 +89,7 @@ const sevBadge = (sev, text) => el("span", { class: `badge ${sev}` }, text || se
 const MARK = { ok: "✓", info: "·", warn: "⚠", alert: "✕" };
 
 // ---------- роутинг ----------
-const VIEWS = ["home", "about", "harvester", "finder", "burner", "drift", "unicode", "chaos"];
+const VIEWS = ["home", "about", "parser", "harvester", "finder", "burner", "drift", "unicode", "chaos"];
 let currentView = null, prevView = null;
 function navigate(view) {
   if (!VIEWS.includes(view)) view = "home";
@@ -108,6 +108,7 @@ function navigate(view) {
   if (view === "burner") initBurnerOnce();
   if (view === "unicode") initUnicodeOnce();
   if (view === "chaos") buildChaosUrl();
+  if (view === "parser") initParserOnce();
 }
 window.addEventListener("hashchange", () => navigate(location.hash.slice(1)));
 document.addEventListener("click", (e) => {
@@ -971,6 +972,111 @@ $("#chTry").addEventListener("click", async () => {
     return el("div", {}, panel, block);
   });
 });
+
+// ---------- старт (перенесён в конец файла, после всех определений) ----------
+
+// =====================================================================
+// WEB PARSER (субфаза 1a: INPUT → INSPECT). Режимы Extract/Crawl/Audit
+// появятся в следующих субфазах — сейчас показываем честную заглушку.
+// =====================================================================
+let parserReady = false;
+const PA_MODE_NOTE = {
+  extract: "Extract — сбор данных (повторяющиеся сущности → поля → таблица → экспорт). Появится в субфазе 1b.",
+  crawl: "Crawl — обход сайта (URL/статусы/редиректы/битые ссылки). Появится в субфазе 1e.",
+  audit: "Audit — массовый сбор тех-полей (title/description/H1/canonical…). Появится в субфазе 1e.",
+  explore: "",
+};
+async function initParserOnce() {
+  if (parserReady) return;
+  parserReady = true;
+  try {
+    const b = await api("/api/parser/backend");
+    $("#paBackend").textContent = `backend: ${b.backend}${b.css ? " · css" : ""}${b.xpath ? " · xpath" : ""}`;
+  } catch {}
+  $("#paGo").addEventListener("click", runParserInspect);
+  $("#paReset").addEventListener("click", () => { $("#paInput").value = ""; $("#paOut").replaceChildren(); $("#paInput").focus(); toast("Сброшено"); });
+  $$("#paModes .pa-mode").forEach((btn) => btn.addEventListener("click", () => selectParserMode(btn.dataset.mode)));
+}
+function selectParserMode(mode) {
+  $$("#paModes .pa-mode").forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  const note = $("#paModeNote");
+  if (mode === "explore") { note.style.display = "none"; note.textContent = ""; }
+  else { note.style.display = ""; note.textContent = PA_MODE_NOTE[mode] || ""; }
+}
+async function runParserInspect() {
+  const input = $("#paInput").value.trim();
+  const out = $("#paOut");
+  if (!input) { toast("Вставьте URL, HTML, JSON или curl", "error"); return; }
+  selectParserMode("explore");
+  await withState(out, "Определяем источник…", async () => {
+    const d = await api("/api/parser/inspect", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input }),
+    });
+    return renderParserInspect(d);
+  });
+}
+function renderParserInspect(d) {
+  const wrap = el("div", {});
+  if (d.error) return State.error(new ApiError(d.error, d.detail));
+
+  // сводка: вид ввода + тип источника
+  const chips = el("div", { class: "chips", style: "margin-bottom:14px" },
+    el("span", { class: "chip active" }, `ввод: ${d.input?.kind || "?"}`),
+    d.source_type ? el("span", { class: "chip" }, `источник: ${d.source_type}`) : null,
+    d.backend ? el("span", { class: "chip" }, `backend: ${d.backend.backend}`) : null);
+  wrap.append(chips);
+
+  (d.notes || []).forEach((n) => wrap.append(el("div", { class: "rb-note", style: "margin-top:0" }, n)));
+
+  // разобранный запрос (для cURL)
+  if (d.request) {
+    const { block, body } = rblock(rbTitle("Разобранный запрос"), { accent: "#a855f7" });
+    body.append(el("pre", { class: "code" }, JSON.stringify(d.request, null, 2)));
+    wrap.append(block);
+  }
+
+  // ответ (для URL)
+  if (d.response) {
+    const r = d.response;
+    const { block, body } = rblock(rbTitle("Ответ"), { accent: "#22d3ee" });
+    body.append(el("div", { class: "statgrid" },
+      statcard(ICON.status, `${r.status}`, "HTTP", r.status < 400 ? "ok" : "alert"),
+      statcard(ICON.time, `${Math.round(r.elapsed_ms)} мс`, "время"),
+      statcard(ICON.tables, `${r.size}`, "байт"),
+      statcard(ICON.api, r.source_type, "тип")));
+    body.append(el("div", { class: "muted", style: "margin-top:8px;word-break:break-all" }, `IP: ${r.resolved_ip} · ${esc(r.final_url)}`));
+    if (window.ForitKit) body.append(ForitKit.jsonTree(r));
+    else body.append(el("pre", { class: "code" }, JSON.stringify(r, null, 2)));
+    wrap.append(block);
+  }
+
+  // сводка источника
+  if (d.summary) {
+    const { block, body } = rblock(rbTitle("Что нашлось"), { accent: "#fb7132", note: d.summary.next_step || d.summary.note || "" });
+    if (d.summary.counts) {
+      body.append(el("div", { class: "chips" },
+        ...Object.entries(d.summary.counts).map(([k, v]) => el("span", { class: "chip" }, `${k}: ${fmtNum(v)}`))));
+    }
+    if (d.summary.source_hints?.length) {
+      body.append(el("div", { class: "rb-note" }, "Подсказки об источниках (полноценная рекомендация — в Extract, 1b):"));
+      d.summary.source_hints.forEach((h) => body.append(finding("info", h.kind,
+        h.location ? `${esc(h.location)}${h.confidence ? " · " + h.confidence : ""}` : `записей: ${h.records ?? "?"}${h.fields?.length ? " · поля: " + h.fields.join(", ") : ""}`)));
+    }
+    if (d.summary.shape) {
+      body.append(el("div", { class: "chips" },
+        el("span", { class: "chip" }, `форма: ${d.summary.shape}`),
+        d.summary.items != null ? el("span", { class: "chip" }, `элементов: ${d.summary.items}`) : null));
+      const keys = d.summary.item_keys || d.summary.top_level_keys;
+      if (keys) body.append(el("div", { class: "muted", style: "margin-top:8px" }, "поля: " + keys.join(", ")));
+    }
+    wrap.append(block);
+  }
+  return wrap;
+}
 
 // ---------- старт ----------
 navigate(location.hash.slice(1) || "home");

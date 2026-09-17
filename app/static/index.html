@@ -24,6 +24,7 @@
     </button>
     <nav id="nav" aria-label="Разделы">
       <button data-nav="home">Главная</button>
+      <button data-nav="parser">Parser</button>
       <button data-nav="harvester">Harvester</button>
       <button data-nav="finder">API Finder</button>
       <button data-nav="burner">Burner</button>
@@ -147,6 +148,43 @@
           </div>
         </div>
       </dialog>
+    </section>
+
+    <!-- WEB PARSER (новый флагман; строится по субфазам, 1a = INPUT → INSPECT) -->
+    <section class="view" id="view-parser" style="--tacc:#22d3ee">
+      <div class="tool-hero">
+        <div class="th-num">🕷</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M8 7l8 4M8 17l8-4"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Web Parser · сбор данных с сайтов</div>
+          <h2>Достань данные с сайта</h2>
+          <p>Вставь ссылку, HTML, JSON или строку <code>curl</code> — Lab определит источник данных и поможет собрать их в таблицу. <span class="muted">Субфаза 1a: определение источника. Извлечение полей, обход и экспорт — в следующих субфазах.</span></p>
+        </div>
+      </div>
+
+      <div class="pa-modes" id="paModes" role="tablist" aria-label="Режимы Web Parser">
+        <button class="pa-mode" data-mode="extract" role="tab">Extract<small>сбор данных</small></button>
+        <button class="pa-mode" data-mode="crawl" role="tab">Crawl<small>обход сайта</small></button>
+        <button class="pa-mode" data-mode="audit" role="tab">Audit<small>тех-поля</small></button>
+        <button class="pa-mode active" data-mode="explore" role="tab" aria-selected="true">Explore<small>разбор источника</small></button>
+      </div>
+
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">parser://input</span><span class="pa-backend" id="paBackend"></span></div>
+        <div class="console-body">
+          <div class="field" style="margin-bottom:12px">
+            <label>URL · HTML · JSON · cURL</label>
+            <textarea id="paInput" placeholder="https://example.com&#10;— или вставь HTML / JSON / строку curl —"></textarea>
+          </div>
+          <div class="c-actions">
+            <button class="btn" id="paGo">Анализировать →</button>
+            <button class="btn ghost" id="paReset">↺ Сбросить</button>
+            <span class="muted">Запрос идёт через защищённый сетевой слой · приватные адреса блокируются · JS не исполняется</span>
+          </div>
+        </div>
+      </div>
+      <div id="paModeNote" class="rb-note" style="display:none"></div>
+      <div id="paOut"></div>
     </section>
 
     <!-- WEB HARVESTER -->

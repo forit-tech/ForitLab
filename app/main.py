@@ -31,6 +31,7 @@ from .tools.apifinder.router import router as apifinder_router
 from .tools.burner.router import router as burner_router
 from .tools.chaos.router import router as chaos_router
 from .tools.drift.router import router as drift_router
+from .tools.parser.router import router as parser_router
 from .tools.scrape.router import router as scrape_router
 from .tools.unicodelab.router import router as unicode_router
 
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(burner_router)
     app.include_router(unicode_router)
     app.include_router(scrape_router)
+    app.include_router(parser_router)
     app.include_router(apifinder_router)
     app.include_router(chaos_router)
 

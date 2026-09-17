@@ -716,3 +716,15 @@ html.modal-open,html.modal-open body{overflow:hidden}
   *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
   .tool-hero .th-icon.th-btn::after{animation:none;opacity:0}
 }
+
+/* ---------- Web Parser: вкладки режимов ---------- */
+.pa-modes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pa-mode{display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:48px;padding:8px 16px;cursor:pointer;
+  font:inherit;font-weight:700;color:var(--dim);background:var(--panel2);border:1px solid var(--border);border-radius:12px;transition:.15s}
+.pa-mode small{font-weight:400;font-size:.72rem;color:var(--faint)}
+.pa-mode:hover{color:var(--text);border-color:var(--border-hi)}
+.pa-mode.active{color:var(--tacc);border-color:color-mix(in srgb,var(--tacc) 60%,transparent);background:color-mix(in srgb,var(--tacc) 12%,transparent)}
+.pa-mode.active small{color:color-mix(in srgb,var(--tacc) 80%,var(--dim))}
+.pa-mode:focus-visible{outline:2px solid var(--tacc);outline-offset:2px}
+.pa-backend{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--faint)}
+@media (max-width:767px){.pa-mode{flex:1 1 42%;min-height:52px}}
