@@ -165,6 +165,43 @@ CHECK_JS = """([mobile, minTouch, minFont]) => {
 }"""
 
 
+def check_about_helpers(page, w, h, mobile, shot_prefix) -> list[dict]:
+    """«Как это работает»: подсказка (маленький ?) и справка (большой ?) открываются, влезают в экран и закрываются."""
+    problems = []
+    def tap(sel):
+        # в тач-контексте — настоящий tap; без has_touch (десктоп, --webkit) — клик
+        try:
+            (page.tap if mobile else page.click)(sel, timeout=4000)
+        except Exception:  # noqa: BLE001
+            page.click(sel)
+    page.evaluate("window.scrollTo(0, 0)")
+    tap("#aboutHintBtn")
+    page.wait_for_timeout(250)
+    box = page.locator("#aboutHint").bounding_box()
+    if page.evaluate("!document.querySelector('#aboutHint').classList.contains('open')"):
+        problems.append({"kind": "hint", "detail": "подсказка не открылась"})
+    elif box["x"] < 0 or box["x"] + box["width"] > w + 1:
+        problems.append({"kind": "hint", "detail": f"подсказка за краем [{round(box['x'])}..{round(box['x'] + box['width'])}]"})
+    if shot_prefix:
+        page.screenshot(path=f"{shot_prefix}-hint.png")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(200)
+    tap("#aboutInfoBtn")
+    page.wait_for_timeout(350)
+    card = page.locator("#aboutDialog .lm-card").bounding_box()
+    if not page.evaluate("document.querySelector('#aboutDialog').open"):
+        problems.append({"kind": "dialog", "detail": "справка не открылась"})
+    elif card["x"] < -1 or card["y"] < -1 or card["x"] + card["width"] > w + 1 or card["y"] + card["height"] > h + 1:
+        problems.append({"kind": "dialog", "detail": f"справка не влезает: {card}"})
+    if shot_prefix:
+        page.screenshot(path=f"{shot_prefix}-dialog.png")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(250)
+    if page.evaluate("document.querySelector('#aboutDialog').open || document.documentElement.classList.contains('modal-open')"):
+        problems.append({"kind": "dialog", "detail": "справка не закрылась по Escape / скролл остался заблокирован"})
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--shots", action="store_true", help="сохранить скриншоты в var/responsive/")
@@ -214,6 +251,8 @@ def main() -> int:
                         page.screenshot(path=str(OUT / f"{vname}-menu.png"))
                     page.keyboard.press("Escape")
                     page.wait_for_timeout(200)
+                if pname == "about":
+                    problems += check_about_helpers(page, w, h, mobile, args.shots and OUT / f"{vname}-about")
                 if problems:
                     report[f"{vname}/{pname}"] = report.get(f"{vname}/{pname}", []) + problems
                     total += len(problems)

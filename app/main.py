@@ -118,11 +118,15 @@ def asset_version(static_dir: Path) -> str:
 
 
 def versioned_index(static_dir: Path) -> str:
-    """index.html со ссылками вида /styles.css?v=<версия> — без сборки, один раз при старте приложения."""
+    """index.html со ссылками вида /styles.css?v=<версия> и версией в футере — без сборки, один раз при старте.
+
+    Единый источник версии — `app.__version__` (его же отдают /health и /api/status).
+    """
     html = (static_dir / "index.html").read_text(encoding="utf-8")
     version = asset_version(static_dir)
     for name in VERSIONED_ASSETS:
         html = re.sub(rf'((?:href|src)="/{re.escape(name)})(?:\?v=[^"]*)?"', rf'\1?v={version}"', html)
+    html = re.sub(r"(<([a-z]+)\b[^>]*\bdata-app-version\b[^>]*>)[^<]*(</\2>)", rf"\1v{__version__}\3", html)
     return html
 
 

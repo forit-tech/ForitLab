@@ -62,6 +62,9 @@ def test_root_busts_asset_cache(client: TestClient) -> None:
         assert match, f"/{asset} без ?v="
         assert match.group(1).startswith(f"{__version__}-")
     assert client.get("/styles.css?v=anything").status_code == 200
+    # версия в футере — из того же источника, что и /health
+    footer = re.search(r"data-app-version[^>]*>([^<]*)<", response.text)
+    assert footer and footer.group(1) == f"v{client.get('/health').json()['version']}" == f"v{__version__}"
 
 
 def test_asset_version_changes_with_content(tmp_path) -> None:

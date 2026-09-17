@@ -98,6 +98,8 @@ function navigate(view) {
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
   $$("#nav button[data-nav]").forEach((b) => b.classList.toggle("active", b.dataset.nav === view));
   setMenu(false);
+  closeHint();
+  closeAboutDialog({ restoreFocus: false });
   if (location.hash !== `#${view}`) location.hash = view;
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (view === "home") initHome();
@@ -131,6 +133,74 @@ document.addEventListener("keydown", (e) => {
 });
 // повернули планшет / расширили окно до десктопа — меню не должно остаться «открытым» с заблокированным скроллом
 matchMedia("(min-width: 1100px)").addEventListener("change", (e) => { if (e.matches) setMenu(false); });
+
+// ---------- «Как это работает»: справка (большой «?») ----------
+// Нативный <dialog>: showModal даёт top layer, ловушку фокуса и закрытие по Escape (iOS Safari 15.4+).
+let dialogReturnFocus = null;
+function openAboutDialog(trigger) {
+  const dlg = $("#aboutDialog");
+  if (!dlg || dlg.open) return;
+  closeHint();
+  dialogReturnFocus = trigger || document.activeElement;
+  if (typeof dlg.showModal === "function") dlg.showModal();
+  else dlg.setAttribute("open", "");
+  document.documentElement.classList.add("modal-open");
+}
+function closeAboutDialog({ restoreFocus = true } = {}) {
+  const dlg = $("#aboutDialog");
+  if (!dlg || !dlg.open) return;
+  if (!restoreFocus) dialogReturnFocus = null; // уходим на другую вью — фокусировать скрытую кнопку незачем
+  if (typeof dlg.close === "function") dlg.close();
+  else { dlg.removeAttribute("open"); onAboutDialogClosed(); }
+}
+function onAboutDialogClosed() {
+  document.documentElement.classList.remove("modal-open");
+  if (dialogReturnFocus && document.contains(dialogReturnFocus)) dialogReturnFocus.focus({ preventScroll: true });
+  dialogReturnFocus = null;
+}
+$("#aboutInfoBtn").addEventListener("click", (e) => openAboutDialog(e.currentTarget));
+$("#aboutDialog").addEventListener("close", onAboutDialogClosed);
+// тап по затемнению (вне карточки) попадает в сам <dialog>; кнопки «✕»/«Понятно» помечены data-close
+$("#aboutDialog").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget || e.target.closest("[data-close]")) closeAboutDialog();
+});
+// Tab/Shift+Tab ходят по кругу внутри справки, а не уходят в адресную строку браузера
+$("#aboutDialog").addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const items = $$("button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])", e.currentTarget)
+    .filter((n) => !n.disabled && n.getClientRects().length);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+// ---------- «Как это работает»: подсказка о странице (маленький «?») ----------
+// Видна, пока её закрепили тапом/кликом, навели мышью или сфокусировали с клавиатуры.
+const hintState = { pinned: false, hover: false, focus: false };
+function syncHint() {
+  const open = hintState.pinned || hintState.hover || hintState.focus;
+  $("#aboutHintBtn").setAttribute("aria-expanded", String(open));
+  $("#aboutHint").classList.toggle("open", open);
+}
+function closeHint() {
+  hintState.pinned = hintState.hover = hintState.focus = false;
+  if ($("#aboutHintBtn")) syncHint();
+}
+$("#aboutHintBtn").addEventListener("click", () => {
+  if (hintState.pinned) closeHint();
+  else { hintState.pinned = true; syncHint(); }
+});
+$("#aboutHintWrap").addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") { hintState.hover = true; syncHint(); } });
+$("#aboutHintWrap").addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") { hintState.hover = false; syncHint(); } });
+$("#aboutHintBtn").addEventListener("focus", (e) => { if (e.target.matches(":focus-visible")) { hintState.focus = true; syncHint(); } });
+$("#aboutHintBtn").addEventListener("blur", () => { hintState.focus = false; syncHint(); });
+document.addEventListener("pointerdown", (e) => {
+  if (hintState.pinned && !e.target.closest("#aboutHintWrap")) closeHint();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("#aboutHint").classList.contains("open")) closeHint();
+});
 
 // ---------- тема ----------
 // Ember — тёмный дизайн, тема фиксирована на dark (переключателя нет).

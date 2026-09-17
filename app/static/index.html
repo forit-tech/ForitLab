@@ -81,7 +81,7 @@
           <div class="safe"></div>
         </div>
         <footer class="foot"><div class="wrap">
-          <span class="fx"><img src="/brand/logo-fox.png" alt=""><b>FORIT TECH <i>| LAB</i></b> <span style="color:var(--faint)">v0.1.0</span></span>
+          <span class="fx"><img src="/brand/logo-fox.png" alt=""><b>FORIT TECH <i>| LAB</i></b> <span class="app-version" data-app-version></span></span>
           <span class="mid">экспериментируй · исследуй · создавай · улучшай</span>
           <span>Сделано с ♥ для тех, кто любит данные</span>
         </div></footer>
@@ -91,9 +91,18 @@
     <!-- КАК ЭТО РАБОТАЕТ / О ПРОЕКТЕ -->
     <section class="view" id="view-about">
       <div class="back-row"><button class="back-link" type="button" data-back>← Назад</button></div>
-      <div class="tool-hero" style="--tacc:#fb7132">
-        <div class="th-num">?</div>
-        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .8-1 1.7M12 17h.01"/></svg></div>
+      <div class="tool-hero about-hero" style="--tacc:#fb7132">
+        <!-- маленький «?» — контекстная подсказка о самой странице (hover / focus / tap) -->
+        <div class="th-hint" id="aboutHintWrap">
+          <button class="th-num th-btn" type="button" id="aboutHintBtn" aria-expanded="false" aria-controls="aboutHint" aria-describedby="aboutHint" aria-label="Подсказка: что на этой странице">?</button>
+          <div class="hint-pop" id="aboutHint" role="tooltip">
+            <b>Это карта лаборатории</b>
+            Ниже весь конвейер по порядку: 6 инструментов — что делает каждый, зачем он и пример. «Открыть →» ведёт прямо в инструмент.
+            <span class="hint-foot">Большой <i>?</i> — короткая справка о Forit Lab.</span>
+          </div>
+        </div>
+        <!-- большой «?» — справка «Что такое Forit Lab?» в модальном окне -->
+        <button class="th-icon th-btn" type="button" id="aboutInfoBtn" aria-haspopup="dialog" aria-controls="aboutDialog" aria-label="Справка: что такое Forit Lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .8-1 1.7M12 17h.01"/></svg></button>
         <div class="th-text">
           <div class="eyebrow">Как это работает</div>
           <h2>Что такое Forit Lab</h2>
@@ -106,6 +115,37 @@
       </div>
 
       <div id="aboutTools"></div>
+
+      <dialog class="lab-modal" id="aboutDialog" aria-labelledby="aboutDialogTitle" aria-describedby="aboutDialogLead">
+        <div class="lm-card">
+          <div class="lm-head">
+            <img class="lm-fox" src="/brand/logo-fox.png" alt="">
+            <div class="lm-titles">
+              <div class="eyebrow">Справка</div>
+              <h3 id="aboutDialogTitle">Что такое Forit Lab?</h3>
+            </div>
+            <button class="lm-close" type="button" data-close aria-label="Закрыть справку">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="lm-body">
+            <p id="aboutDialogLead">Лаборатория FORIT TECH: шесть инструментов для данных, API и текста в одном интерфейсе. Работает на чистом Python — без базы, очередей и нейросетей.</p>
+            <ul class="lm-list">
+              <li><button type="button" data-nav="finder" style="--tacc:#a855f7"><b>API Finder</b><span>найти бесплатный API под задачу</span></button></li>
+              <li><button type="button" data-nav="harvester" style="--tacc:#22d3ee"><b>Web Harvester</b><span>достать таблицы и сущности со страницы</span></button></li>
+              <li><button type="button" data-nav="burner" style="--tacc:#fb7132"><b>Data Burner</b><span>сгенерировать синтетику с дефектами</span></button></li>
+              <li><button type="button" data-nav="unicode" style="--tacc:#c084fc"><b>Unicode Crime Lab</b><span>найти невидимый мусор в тексте</span></button></li>
+              <li><button type="button" data-nav="drift" style="--tacc:#3b82f6"><b>Drift Lab</b><span>сравнить две версии данных</span></button></li>
+              <li><button type="button" data-nav="chaos" style="--tacc:#f43f5e"><b>Chaos API</b><span>проверить клиент на плохих ответах</span></button></li>
+            </ul>
+            <p class="lm-note">Эта страница — подробная карта: что делает каждый инструмент, зачем он нужен и пример использования.</p>
+          </div>
+          <div class="lm-foot">
+            <button class="btn ghost" type="button" data-close>Понятно</button>
+            <button class="btn" type="button" data-nav="finder">Начать с API Finder →</button>
+          </div>
+        </div>
+      </dialog>
     </section>
 
     <!-- WEB HARVESTER -->

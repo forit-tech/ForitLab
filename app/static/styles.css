@@ -38,7 +38,11 @@ img,svg{max-width:100%}
 body{margin:0;font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.55;overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
   background-image:radial-gradient(1200px 700px at 100% -2%,rgba(251,113,50,.10),transparent 60%),
-                   radial-gradient(900px 600px at 0% 40%,rgba(168,85,247,.05),transparent 60%);}
+                   radial-gradient(900px 600px at 0% 40%,rgba(168,85,247,.05),transparent 60%);
+  /* фон body растягивается на весь холст; на коротких страницах (инструмент без результатов) градиенты
+     по умолчанию повторялись — под контентом появлялась вторая копия свечения со швом («огрызок») */
+  background-repeat:no-repeat}
+html{min-height:100%}
 a{color:var(--ember-lt);text-decoration:none} a:hover{text-decoration:underline}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut-r) 0 var(--gut-l)}
 
@@ -109,7 +113,7 @@ main{padding-top:0}
 .hero-cta{display:flex;gap:13px;flex-wrap:wrap;margin-bottom:24px}
 .hero-quote{margin:0;max-width:460px;position:relative;padding-left:20px;border-left:3px solid var(--ember);
   color:var(--text);font-size:1.16rem;font-style:italic;line-height:1.45}
-.hero-quote .mk{position:absolute;left:8px;top:-10px;font-size:2.4rem;color:var(--ember);opacity:.5;font-family:Georgia,serif}
+.hero-quote .mk{position:absolute;left:-1px;top:-10px;font-size:2.4rem;color:var(--ember);opacity:.5;font-family:Georgia,serif}
 .hero-quote cite{display:block;margin-top:8px;font-style:normal;font-size:.9rem;color:var(--ember-lt);font-weight:600}
 
 /* ---------- tools section (главная) ---------- */
@@ -169,6 +173,7 @@ main{padding-top:0}
 .foot .fx{display:flex;align-items:center;gap:9px}
 .foot .fx img{width:26px;height:26px;object-fit:contain}
 .foot .fx b{color:#f4ede7;font-weight:800} .foot .fx b i{font-style:normal;color:var(--ember-lt)}
+.foot .app-version{color:var(--faint)} .foot .app-version:empty{display:none}
 .foot .mid{margin:0 auto;font-family:var(--mono);font-size:.78rem}
 
 /* ---------- view-head (инструменты) ---------- */
@@ -614,8 +619,100 @@ table.dtable td.num{text-align:right;font-family:var(--mono);color:var(--ember-l
   .tool-card .art img{object-fit:cover}
 }
 
+/* =========================================================
+   «КАК ЭТО РАБОТАЕТ»: интерактивные «?» — подсказка и справка
+   ========================================================= */
+.th-btn{font:inherit;cursor:pointer;-webkit-appearance:none;appearance:none;touch-action:manipulation;
+  transition:transform .16s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease,color .2s ease}
+.th-btn:focus-visible{outline:2px solid var(--tacc);outline-offset:3px}
+.th-btn:active{transform:scale(.94)}
+/* большой «?» */
+.tool-hero .th-icon.th-btn{position:relative;padding:0;color:inherit}
+.tool-hero .th-icon.th-btn::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+  border:1px solid color-mix(in srgb,var(--tacc) 60%,transparent);animation:th-ping 2.8s ease-out infinite}
+@keyframes th-ping{0%{opacity:.7;transform:scale(1)}70%,100%{opacity:0;transform:scale(1.28)}}
+.tool-hero .th-icon.th-btn[aria-expanded="true"],.modal-open .tool-hero .th-icon.th-btn{border-color:var(--tacc)}
+/* маленький «?» */
+.th-hint{position:relative;align-self:flex-start;margin-top:4px;z-index:5}
+.tool-hero .th-hint .th-num{margin:0;background:transparent;min-width:30px;line-height:1.35}
+@media (max-width:1024px),(pointer:coarse){.tool-hero .th-hint .th-num{min-width:44px;min-height:44px;display:grid;place-items:center}}
+.tool-hero .th-num.th-btn[aria-expanded="true"]{background:color-mix(in srgb,var(--tacc) 22%,transparent);border-color:var(--tacc);color:var(--ember-lt)}
+@media (hover:hover){
+  .tool-hero .th-icon.th-btn:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--tacc) 80%,var(--border));
+    box-shadow:0 0 38px color-mix(in srgb,var(--tacc) 42%,transparent)}
+  .tool-hero .th-num.th-btn:hover{background:color-mix(in srgb,var(--tacc) 16%,transparent);border-color:var(--tacc)}
+}
+.hint-pop{position:absolute;left:0;top:calc(100% + 10px);width:min(320px,calc(100vw - 48px));padding:13px 15px;border-radius:12px;
+  font-size:.88rem;line-height:1.5;color:var(--dim);text-align:left;
+  background:rgba(18,12,16,.97);border:1px solid color-mix(in srgb,var(--tacc) 45%,var(--border));
+  box-shadow:0 18px 44px rgba(0,0,0,.6),0 0 26px color-mix(in srgb,var(--tacc) 16%,transparent);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  visibility:hidden;opacity:0;transform:translateY(-4px);transition:opacity .16s ease,transform .16s ease,visibility 0s linear .16s}
+.hint-pop.open{visibility:visible;opacity:1;transform:none;transition:opacity .16s ease,transform .16s ease}
+.hint-pop::before{content:"";position:absolute;top:-6px;left:var(--caret-x,12px);width:10px;height:10px;transform:rotate(45deg);
+  background:inherit;border-left:1px solid color-mix(in srgb,var(--tacc) 45%,var(--border));border-top:1px solid color-mix(in srgb,var(--tacc) 45%,var(--border))}
+.hint-pop b{display:block;color:var(--text);margin-bottom:4px;font-size:.92rem}
+.hint-pop .hint-foot{display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:.8rem;color:var(--faint)}
+.hint-pop .hint-foot i{font-style:normal;color:var(--tacc);font-weight:700}
+
+/* справка — нативный <dialog> */
+html.modal-open,html.modal-open body{overflow:hidden}
+.lab-modal{--tacc:var(--ember);padding:0;border:none;background:transparent;color:var(--text);
+  width:min(560px,calc(100vw - 32px));max-width:none;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow:visible}
+.lab-modal::backdrop{background:rgba(3,2,4,.66);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.lab-modal[open]{animation:lm-in .2s ease}
+@keyframes lm-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.lm-card{display:flex;flex-direction:column;max-height:inherit;border-radius:18px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(28,18,24,.98),rgba(12,8,11,.98));
+  border:1px solid color-mix(in srgb,var(--tacc) 35%,var(--border));
+  box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 50px color-mix(in srgb,var(--tacc) 16%,transparent)}
+.lm-head{display:flex;align-items:center;gap:12px;padding:16px 14px 14px 18px;border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--tacc) 12%,transparent),transparent 70%)}
+.lm-fox{width:42px;height:42px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 12px rgba(251,113,50,.5))}
+.lm-titles{flex:1;min-width:0}
+.lm-titles .eyebrow{margin-bottom:2px;font-size:.7rem}
+.lm-head h3{margin:0;font-size:1.25rem;font-weight:800;line-height:1.2}
+.lm-close{width:44px;height:44px;flex:0 0 auto;display:grid;place-items:center;border-radius:12px;cursor:pointer;color:var(--dim);
+  background:var(--panel2);border:1px solid var(--border-hi);transition:.15s}
+.lm-close svg{width:20px;height:20px}
+.lm-close:hover{color:var(--text);border-color:var(--ember)}
+.lm-close:focus-visible,.lm-list button:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+.lm-body{padding:16px 18px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.lm-body > p{margin:0 0 14px;color:var(--dim);font-size:.95rem}
+.lm-list{list-style:none;margin:0 0 14px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lm-list button{width:100%;min-height:58px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;
+  text-align:left;padding:9px 12px 9px 26px;position:relative;cursor:pointer;font:inherit;color:var(--text);
+  border-radius:11px;background:rgba(255,255,255,.02);border:1px solid var(--border);transition:.15s}
+.lm-list button::before{content:"";position:absolute;left:11px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;
+  background:var(--tacc);box-shadow:0 0 10px var(--tacc)}
+.lm-list button b{font-size:.9rem}
+.lm-list button span{font-size:.78rem;color:var(--faint);line-height:1.3}
+.lm-list button:hover{border-color:color-mix(in srgb,var(--tacc) 60%,var(--border));background:color-mix(in srgb,var(--tacc) 9%,transparent)}
+.lm-note{margin:0;font-size:.84rem;color:var(--faint);border-left:2px solid var(--ember);padding-left:10px}
+.lm-foot{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding:12px 18px 16px;border-top:1px solid var(--border)}
+
+@media (max-width:767px){
+  /* подсказка на телефоне — на всю ширину шапки, под строкой «иконка + номер» */
+  .about-hero{position:relative}
+  .tool-hero .th-hint{position:static;grid-area:num;justify-self:start;align-self:center;margin:0}
+  .tool-hero .th-hint .th-num{min-width:44px;min-height:44px;display:grid;place-items:center}
+  .hint-pop{left:0;right:0;width:auto;top:66px;--caret-x:82px}
+  /* справка на телефоне — bottom sheet над home indicator */
+  .lab-modal{width:100%;margin:auto 0 0;max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px - var(--safe-t))}
+  .lab-modal[open]{animation:lm-sheet .24s ease}
+  @keyframes lm-sheet{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+  .lm-card{border-radius:20px 20px 0 0;border-bottom:none}
+  .lm-head{padding:14px 12px 12px 16px}
+  .lm-body{padding:14px 16px}
+  .lm-list{grid-template-columns:1fr}
+  .lm-list button{min-height:52px}
+  .lm-foot{padding:12px 16px calc(14px + var(--safe-b))}
+  .lm-foot .btn{flex:1 1 auto}
+}
+
 /* ---- уважение к reduce-motion ---- */
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  .tool-hero .th-icon.th-btn::after{animation:none;opacity:0}
 }

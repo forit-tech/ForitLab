@@ -128,6 +128,45 @@ def test_no_user_agent_sniffing_for_layout(js: str) -> None:
     assert "navigator.userAgent" not in js and "navigator.platform" not in js
 
 
+def test_about_question_marks_are_real_controls(html: str, js: str) -> None:
+    # оба «?» — настоящие кнопки с разными действиями, а не декоративные div
+    small = re.search(r'<button[^>]*id="aboutHintBtn"[^>]*>', html)
+    big = re.search(r'<button[^>]*id="aboutInfoBtn"[^>]*>', html)
+    assert small and big, "«?» на странице «Как это работает» должны быть <button>"
+    for attr in ('aria-expanded="false"', 'aria-controls="aboutHint"', "aria-label="):
+        assert attr in small.group(0)
+    for attr in ('aria-haspopup="dialog"', 'aria-controls="aboutDialog"', "aria-label="):
+        assert attr in big.group(0)
+    assert re.search(r'<dialog[^>]*id="aboutDialog"[^>]*aria-labelledby="aboutDialogTitle"', html)
+    assert 'id="aboutHint" role="tooltip"' in html
+    # справка закрывается кнопкой, тапом вне карточки и Escape (нативный cancel у showModal); фокус возвращается
+    assert "data-close" in html and "e.target === e.currentTarget" in js and "showModal" in js
+    assert "dialogReturnFocus" in js and '"Escape"' in js
+    # при навигации обе всплывашки закрываются
+    start = js.index("function navigate(view)")
+    body = js[start : js.index("\n}\n", start)]
+    assert "closeHint()" in body and "closeAboutDialog(" in body
+
+
+def test_modal_css_is_mobile_safe(css: str) -> None:
+    assert "html.modal-open,html.modal-open body{overflow:hidden}" in css
+    assert re.search(r"\.lab-modal\{[^}]*max-height:calc\(100dvh", css)
+    phone = "\n".join(media_blocks(css, "max-width:767px"))
+    assert ".lm-foot{" in phone and "var(--safe-b)" in phone, "шторка справки должна учитывать home indicator"
+
+
+def test_short_pages_do_not_tile_background(css: str) -> None:
+    # «огрызок» внизу коротких страниц: фон body растягивается на холст и без no-repeat повторяется со швом
+    body = re.search(r"\nbody\{(.*?)\}\n", css, re.S).group(1)
+    assert "background-image:" in body and "background-repeat:no-repeat" in body
+    assert "html{min-height:100%}" in css
+
+
+def test_footer_version_is_not_hardcoded(html: str) -> None:
+    assert "data-app-version" in html
+    assert not re.search(r">\s*v\d+\.\d+\.\d+\s*<", html), "версия в футере должна подставляться из app.__version__"
+
+
 def test_drift_table_has_mobile_labels(js: str) -> None:
     # таблица распределений на телефоне превращается в карточки через data-label — подписи не должны потеряться
     for label in ("Анализ", "PSI", "KS", "Статус"):

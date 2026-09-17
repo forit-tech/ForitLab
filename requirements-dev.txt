@@ -4,3 +4,7 @@
 uvicorn==0.34.0
 httpx==0.28.1
 pytest==8.3.4
+# Playwright нужен только для tools/responsive_audit.py и tools/shots.py
+# (браузерные проверки адаптива/скриншоты). Не входит в CI-юниттесты.
+# После установки: `python -m playwright install chromium` (и webkit при желании).
+playwright==1.49.1
