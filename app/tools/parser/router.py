@@ -200,6 +200,30 @@ def do_request(payload: RequestModel) -> dict:
     return result
 
 
+class ReproduceRequest(BaseModel):
+    request: RequestModel | None = None
+    url: str | None = None
+    schema_: SchemaModel | None = Field(default=None, alias="schema")
+    model_config = {"populate_by_name": True}
+
+
+@router.post("/reproduce", summary="Воспроизводимый код: curl + Python (1f)")
+def reproduce(payload: ReproduceRequest) -> dict:
+    from ...parser.models import RequestSpec
+    from ...parser.reproduce import reproduce as gen
+
+    if payload.request:
+        spec = RequestSpec(method=payload.request.method.upper(), url=payload.request.url,
+                           headers=dict(payload.request.headers), cookies=dict(payload.request.cookies),
+                           body=payload.request.body, content_type=payload.request.content_type)
+    elif payload.url:
+        spec = RequestSpec(method="GET", url=payload.url)
+    else:
+        return {"error": "Нужен url или request"}
+    schema = ExtractionSchema.from_dict(payload.schema_.model_dump(by_alias=False)) if payload.schema_ else None
+    return gen(spec, schema)
+
+
 @router.post("/sandbox", summary="Санитизированный HTML для визуального выбора (1b)")
 def sandbox(payload: AnalyzeRequest) -> dict:
     try:

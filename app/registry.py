@@ -11,7 +11,7 @@ from .tools.burner import TOOL_ID as BURNER_ID, TOOL_SUMMARY as BURNER_SUMMARY, 
 from .tools.chaos import TOOL_ID as CHAOS_ID, TOOL_SUMMARY as CHAOS_SUMMARY, TOOL_TITLE as CHAOS_TITLE
 from .tools.drift import TOOL_ID, TOOL_SUMMARY, TOOL_TITLE
 from .tools.apifinder import TOOL_ID as FINDER_ID, TOOL_SUMMARY as FINDER_SUMMARY, TOOL_TITLE as FINDER_TITLE
-from .tools.scrape import TOOL_ID as SCRAPE_ID, TOOL_SUMMARY as SCRAPE_SUMMARY, TOOL_TITLE as SCRAPE_TITLE
+from .parser import TOOL_ID as PARSER_ID, TOOL_SUMMARY as PARSER_SUMMARY, TOOL_TITLE as PARSER_TITLE
 from .tools.unicodelab import TOOL_ID as UNICODE_ID, TOOL_SUMMARY as UNICODE_SUMMARY, TOOL_TITLE as UNICODE_TITLE
 
 TOOLS: list[ToolInfo] = [
@@ -48,12 +48,12 @@ TOOLS: list[ToolInfo] = [
         docs_anchor="/docs#/Unicode%20Crime%20Lab",
     ),
     ToolInfo(
-        id=SCRAPE_ID,
-        title=SCRAPE_TITLE,
-        summary=SCRAPE_SUMMARY,
+        id=PARSER_ID,
+        title=PARSER_TITLE,
+        summary=PARSER_SUMMARY,
         status="available",
-        base_path="/api/scrape",
-        docs_anchor="/docs#/Scrape%20Lab",
+        base_path="/api/parser",
+        docs_anchor="/docs#/Web%20Parser",
     ),
     ToolInfo(
         id=FINDER_ID,

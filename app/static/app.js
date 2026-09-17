@@ -93,6 +93,7 @@ const VIEWS = ["home", "about", "parser", "harvester", "finder", "burner", "drif
 let currentView = null, prevView = null;
 function navigate(view) {
   if (!VIEWS.includes(view)) view = "home";
+  if (view === "harvester") view = "parser"; // миграция: Web Harvester → Web Parser
   // navigate срабатывает дважды (клик + hashchange) — запоминаем предыдущую вью только при реальной смене
   if (view !== currentView) { prevView = currentView; currentView = view; }
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
@@ -107,7 +108,7 @@ function navigate(view) {
   if (view === "finder") initFinderOnce();
   if (view === "burner") initBurnerOnce();
   if (view === "unicode") initUnicodeOnce();
-  if (view === "chaos") buildChaosUrl();
+  if (view === "chaos") { buildChaosUrl(); showChaosHandoff(); }
   if (view === "parser") initParserOnce();
 }
 window.addEventListener("hashchange", () => navigate(location.hash.slice(1)));
@@ -211,7 +212,7 @@ document.documentElement.dataset.theme = "dark";
 // ГЛАВНАЯ
 // =====================================================================
 const TOOLS_META = {
-  harvester: { title: "Web Harvester", sub: "Достань данные со страниц", img: "harvester", accent: "#22d3ee", tags: ["HTML", "Table", "Dataset"] },
+  harvester: { title: "Web Parser", sub: "Собери данные с сайта в таблицу", img: "harvester", accent: "#22d3ee", tags: ["HTML", "Table", "Dataset"] },
   finder: { title: "API Finder", sub: "Найди бесплатные API под задачу", img: "finder", accent: "#a855f7", tags: ["API", "Free tier", "Integrations"] },
   burner: { title: "Data Burner", sub: "Создай синтетику с дефектами", img: "burner", accent: "#fb7132", tags: ["Dataset", "Anomalies", "Test"] },
   drift: { title: "Drift Lab", sub: "Сравни версии данных", img: "drift", accent: "#3b82f6", tags: ["Drift", "Analytics", "Insights"] },
@@ -220,7 +221,7 @@ const TOOLS_META = {
 };
 // ---------- О проекте / Как это работает ----------
 const ABOUT = [
-  { id: "harvester", name: "Web Harvester", accent: "#22d3ee",
+  { id: "harvester", name: "Web Parser", accent: "#22d3ee",
     what: "Принимает ссылку на публичную страницу и вытаскивает всё структурированное: таблицы, повторяющиеся карточки-сущности, ссылки, картинки, формы, метаданные, JSON-LD и кандидатов в открытые API.",
     why: "Быстро превратить любую веб-страницу в датасет, не открывая DevTools и не пиша парсер под каждый сайт.",
     example: "Дал ссылку на статью со списком стран → получил CSV с таблицей ВВП одним кликом." },
@@ -1211,7 +1212,9 @@ function renderActions() {
     el("button", { class: "btn ghost", onclick: () => paExport("csv") }, "↓ CSV"),
     el("button", { class: "btn ghost", onclick: () => paExport("json") }, "↓ JSON"),
     el("button", { class: "btn ghost", onclick: () => paExport("jsonl") }, "↓ JSONL"),
-    el("button", { class: "btn ghost", onclick: () => paExport("manifest") }, "↓ Manifest"));
+    el("button", { class: "btn ghost", onclick: () => paExport("manifest") }, "↓ Manifest"),
+    el("button", { class: "btn ghost", onclick: reproduceFromExtract }, "⟲ Reproduce"),
+    el("button", { class: "btn ghost", onclick: () => handoffToChaos(paState.input) }, "→ Chaos"));
 }
 
 function collectSchema() {
@@ -1542,7 +1545,9 @@ function renderRequestResponse(d) {
     toExtract.disabled = true;
     toExtract.title = "Передача не-GET запроса в Extract — в следующей итерации";
   }
-  body.append(el("div", { class: "row", style: "margin-top:12px" }, toExtract));
+  const reproEx = el("button", { class: "btn ghost", onclick: () => showReproduce(paState.lastRequest, null) }, "⟲ Reproduce");
+  const chaosEx = el("button", { class: "btn ghost", onclick: () => handoffToChaos(r.final_url) }, "→ Chaos");
+  body.append(el("div", { class: "row", style: "margin-top:12px" }, toExtract, reproEx, chaosEx));
   wrap.append(block);
   return wrap;
 }
@@ -1551,6 +1556,64 @@ function handoffToExtract(r) {
   $("#paInput").value = r.final_url;
   selectParserMode("extract");
   runParserExtract();
+}
+
+
+// =====================================================================
+// WEB PARSER · Reproduce (1f) + handoff в Chaos
+// =====================================================================
+function paCodeBox(title, code) {
+  const pre = el("pre", { class: "code" }, code);
+  const copy = el("button", { class: "btn sm ghost", onclick: async () => {
+    try { await navigator.clipboard.writeText(code); toast("Скопировано", "success"); }
+    catch { const r = document.createRange(); r.selectNode(pre); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand("copy"); toast("Скопировано", "success"); }
+  } }, "Копировать");
+  return el("div", { style: "margin-bottom:12px" },
+    el("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-bottom:4px" },
+      el("b", {}, title), copy), pre);
+}
+
+async function showReproduce(request, schema) {
+  let d;
+  try {
+    d = await api("/api/parser/reproduce", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ request, schema: schema || null }),
+    });
+  } catch (e) { toast(String(e), "error"); return; }
+  if (d.error) { toast(d.error, "error"); return; }
+  const content = el("div", {},
+    paCodeBox("curl", d.curl),
+    paCodeBox("Python (requests + lxml)", d.python),
+    el("div", { class: "muted" }, "Секреты заменены плейсхолдерами из окружения ($AUTH_TOKEN, $API_KEY…)."));
+  if (window.ForitKit) { const m = ForitKit.dialog({ title: "Воспроизвести", content }); m.open(); }
+  else { $("#paOut").append(content); }
+}
+
+function reproduceFromExtract() {
+  const schema = collectSchema();
+  showReproduce({ method: "GET", url: paState.input, headers: {} }, schema);
+}
+
+function handoffToChaos(url) {
+  try { sessionStorage.setItem("forit-chaos-target", url || paState.input || ""); } catch {}
+  navigate("chaos");
+}
+
+// баннер в Chaos, если пришли из Web Parser (Chaos-проверка сайта — отдельная фаза)
+function showChaosHandoff() {
+  let url = null;
+  try { url = sessionStorage.getItem("forit-chaos-target"); sessionStorage.removeItem("forit-chaos-target"); } catch {}
+  if (!url) return;
+  const out = $("#chOut");
+  if (!out) return;
+  const note = el("div", { class: "rblock", style: "--tacc:#f43f5e" });
+  note.innerHTML =
+    `<div class="rb-head"><div class="rb-title"><span class="dotmark"></span>Из Web Parser</div></div>` +
+    `<div class="rb-body"><p class="rb-note" style="margin:0">Получен URL для проверки безопасности: ` +
+    `<span class="mono" style="word-break:break-all">${esc(url)}</span>. ` +
+    `Полноценная проверка сайта (Chaos Security Check) появится в отдельной фазе — сейчас доступен генератор плохих ответов ниже.</p></div>`;
+  out.replaceChildren(note);
 }
 
 // ---------- старт ----------

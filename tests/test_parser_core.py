@@ -223,9 +223,12 @@ def test_parser_inspect_endpoint_html(client: TestClient) -> None:
     assert r.json()["source_type"] == "html"
 
 
-def test_old_scrape_still_registered(client: TestClient) -> None:
-    # старый Scrape не сломан и не удалён
+def test_old_scrape_endpoints_compat(client: TestClient) -> None:
+    # после миграции (1f) реестр показывает parser, но /api/scrape остаётся
+    # совместимым (не удалён — его модули парсинга живые зависимости Parser)
     assert client.get("/api/scrape/limits").status_code == 200
     tools = client.get("/api/tools").json()
     rows = tools["tools"] if isinstance(tools, dict) else tools
-    assert any(t["id"] == "scrape" for t in rows)
+    ids = [t["id"] for t in rows]
+    assert "parser" in ids
+    assert "scrape" not in ids
