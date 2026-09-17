@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-VERSIONED_ASSETS = ("styles.css", "app.js")
+VERSIONED_ASSETS = ("styles.css", "app.js", "ui/kit.css", "ui/kit.js", "ui/caps.js")
 
 from . import __service__, __version__
 from .config import settings

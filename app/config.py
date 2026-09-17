@@ -117,6 +117,23 @@ class Settings:
     # --- Unicode Crime Lab ------------------------------------------------
     unicode_max_chars: int = _env_int("FORIT_UNICODE_MAX_CHARS", 50_000)
 
+    # --- Job execution (ChunkedCursorExecutor, Host-0) --------------------
+    #: Состояние порционных задач (crawl/scan) переживает многопроцессный
+    #: Passenger только на диске: воркеры не делят память. Каталог — внутри var.
+    jobs_max_count: int = _env_int("FORIT_JOBS_MAX_COUNT", 200)
+    jobs_max_job_bytes: int = _env_int("FORIT_JOBS_MAX_JOB_BYTES", 2 * 1024 * 1024)
+    jobs_max_total_bytes: int = _env_int("FORIT_JOBS_MAX_TOTAL_BYTES", 64 * 1024 * 1024)
+    jobs_ttl_hours: int = _env_int("FORIT_JOBS_TTL_HOURS", 6)
+
+    # --- Crawl (Web Parser / будущий Chaos scope) -------------------------
+    crawl_max_pages: int = _env_int("FORIT_CRAWL_MAX_PAGES", 50)
+    crawl_max_depth: int = _env_int("FORIT_CRAWL_MAX_DEPTH", 2)
+    crawl_max_requests: int = _env_int("FORIT_CRAWL_MAX_REQUESTS", 200)
+    crawl_max_bytes: int = _env_int("FORIT_CRAWL_MAX_BYTES", 32 * 1024 * 1024)
+    crawl_delay_ms: int = _env_int("FORIT_CRAWL_DELAY_MS", 200)
+    #: Сколько единиц работы делает один step() (порция chunked-исполнения).
+    crawl_step_max_units: int = _env_int("FORIT_CRAWL_STEP_MAX_UNITS", 10)
+
     # --- API --------------------------------------------------------------
     enable_docs: bool = _env_bool("FORIT_ENABLE_DOCS", True)
     enable_status: bool = _env_bool("FORIT_ENABLE_STATUS", True)
@@ -130,6 +147,10 @@ class Settings:
     @property
     def reports_dir(self) -> Path:
         return self.state_dir / "reports"
+
+    @property
+    def jobs_dir(self) -> Path:
+        return self.state_dir / "jobs"
 
 
 settings = Settings()
