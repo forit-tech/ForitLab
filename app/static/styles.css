@@ -728,3 +728,13 @@ html.modal-open,html.modal-open body{overflow:hidden}
 .pa-mode:focus-visible{outline:2px solid var(--tacc);outline-offset:2px}
 .pa-backend{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--faint)}
 @media (max-width:767px){.pa-mode{flex:1 1 42%;min-height:52px}}
+
+/* ---------- Web Parser: редактор полей + визуальный выбор ---------- */
+#paFields input,#paFields select{padding:6px 8px;font-size:.82rem;min-width:70px}
+#paFields .pa-f-sel{font-family:var(--mono);min-width:150px}
+#paFields td{vertical-align:middle}
+.pa-visual{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;background:rgba(3,2,4,.9);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:calc(14px + var(--safe-t)) 14px calc(14px + var(--safe-b))}
+.pa-visual-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;color:var(--text);
+  background:var(--panel-solid);border:1px solid var(--border-hi);border-radius:12px 12px 0 0;font-size:.9rem}
+.pa-visual-frame{flex:1;width:100%;border:1px solid var(--border-hi);border-top:none;border-radius:0 0 12px 12px;background:#fff}

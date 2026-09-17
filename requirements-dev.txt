@@ -8,10 +8,3 @@ pytest==8.3.4
 # (браузерные проверки адаптива/скриншоты). Не входит в CI-юниттесты.
 # После установки: `python -m playwright install chromium` (и webkit при желании).
 playwright==1.49.1
-
-# Selector-backend Web Parser (вариант A). ПОКА dev-only: в прод requirements.txt
-# добавляется ТОЛЬКО после Host-0 gate (tools/selector_spike.py на CPython 3.13).
-# Если lxml не встанет на Host-0 — fallback B (html5lib+cssselect+elementpath),
-# приложение работает и без них (stdlib-пол DOM), просто без CSS/XPath-селекторов.
-lxml==5.3.0
-cssselect==1.2.0

@@ -981,11 +981,13 @@ $("#chTry").addEventListener("click", async () => {
 // =====================================================================
 let parserReady = false;
 const PA_MODE_NOTE = {
-  extract: "Extract — сбор данных (повторяющиеся сущности → поля → таблица → экспорт). Появится в субфазе 1b.",
+  extract: "",
   crawl: "Crawl — обход сайта (URL/статусы/редиректы/битые ссылки). Появится в субфазе 1e.",
   audit: "Audit — массовый сбор тех-полей (title/description/H1/canonical…). Появится в субфазе 1e.",
   explore: "",
 };
+let paMode = "explore";
+const paState = { input: "", base_url: "", schema: null };
 async function initParserOnce() {
   if (parserReady) return;
   parserReady = true;
@@ -993,19 +995,28 @@ async function initParserOnce() {
     const b = await api("/api/parser/backend");
     $("#paBackend").textContent = `backend: ${b.backend}${b.css ? " · css" : ""}${b.xpath ? " · xpath" : ""}`;
   } catch {}
-  $("#paGo").addEventListener("click", runParserInspect);
-  $("#paReset").addEventListener("click", () => { $("#paInput").value = ""; $("#paOut").replaceChildren(); $("#paInput").focus(); toast("Сброшено"); });
+  $("#paGo").addEventListener("click", runParserGo);
+  $("#paReset").addEventListener("click", () => { $("#paInput").value = ""; $("#paOut").replaceChildren(); paState.schema = null; $("#paInput").focus(); toast("Сброшено"); });
   $$("#paModes .pa-mode").forEach((btn) => btn.addEventListener("click", () => selectParserMode(btn.dataset.mode)));
 }
 function selectParserMode(mode) {
+  paMode = mode;
   $$("#paModes .pa-mode").forEach((b) => {
     const on = b.dataset.mode === mode;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", String(on));
   });
   const note = $("#paModeNote");
-  if (mode === "explore") { note.style.display = "none"; note.textContent = ""; }
-  else { note.style.display = ""; note.textContent = PA_MODE_NOTE[mode] || ""; }
+  const roadmap = PA_MODE_NOTE[mode] || "";
+  note.style.display = roadmap ? "" : "none";
+  note.textContent = roadmap;
+  if (roadmap) $("#paOut").replaceChildren(); // Crawl/Audit ещё не реализованы — не показываем чужой результат
+}
+// paGo диспетчеризует по активному режиму: Extract → сбор данных, Explore → разбор
+async function runParserGo() {
+  if (paMode === "extract") return runParserExtract();
+  if (paMode === "crawl" || paMode === "audit") { toast("Этот режим появится в следующей субфазе", "error"); return; }
+  return runParserInspect();
 }
 async function runParserInspect() {
   const input = $("#paInput").value.trim();
@@ -1076,6 +1087,245 @@ function renderParserInspect(d) {
     wrap.append(block);
   }
   return wrap;
+}
+
+
+// =====================================================================
+// WEB PARSER · Extract (1b): источник → поля → preview → export
+// =====================================================================
+const PA_SOURCES = ["text", "attr", "html", "url", "image", "file_url"];
+const PA_TRANSFORMS = ["", "trim", "normalize_ws", "regex", "number", "date"];
+
+async function runParserExtract() {
+  const input = $("#paInput").value.trim();
+  if (!input) { toast("Вставьте URL или HTML", "error"); return; }
+  paState.input = input;
+  await withState($("#paOut"), "Анализируем источники…", async () => {
+    const d = await api("/api/parser/analyze", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input }),
+    });
+    if (d.error) return State.error(new ApiError(d.error, d.detail));
+    paState.base_url = d.base_url || "";
+    return renderExtract(d.recommendation);
+  });
+}
+
+function renderExtract(rec) {
+  const wrap = el("div", {});
+  if (!rec || !rec.selected) {
+    wrap.append(el("div", { class: "state" }, el("div", { class: "ico" }, "🕳️"), rec ? rec.reason : "Источников не найдено"));
+    if (rec && rec.alternatives && rec.alternatives.length) wrap.append(renderAlternatives(rec));
+    return wrap;
+  }
+  const sel = rec.selected;
+  const { block, body } = rblock(rbTitle("Рекомендуемый источник"), { accent: "#22d3ee" });
+  body.append(el("div", { class: "chips" },
+    el("span", { class: "chip active" }, sel.kind),
+    el("span", { class: "chip" }, `записей: ${sel.record_count == null ? "?" : sel.record_count}`),
+    el("span", { class: "chip" }, `уверенность: ${rec.confidence}`),
+    sel.stable_ids ? el("span", { class: "chip" }, "стабильные id") : null));
+  body.append(el("div", { class: "muted", style: "margin:6px 0" }, `почему: ${rec.reason}`));
+  (sel.evidence || []).forEach((e) => body.append(finding("info", "", e)));
+  if (sel.location) body.append(el("div", { class: "mono", style: "margin-top:6px;word-break:break-all" }, esc(sel.location)));
+  wrap.append(block);
+
+  if (rec.alternatives && rec.alternatives.length) wrap.append(renderAlternatives(rec));
+
+  if (sel.kind === "repeated_dom" && sel.schema) {
+    paState.schema = JSON.parse(JSON.stringify(sel.schema));
+    wrap.append(renderFieldEditor());
+  } else if (sel.schema) {
+    paState.schema = JSON.parse(JSON.stringify(sel.schema));
+    const note = rblock(rbTitle("Поля"), { accent: "#a855f7", note: "Для JSON-источника берутся все ключи объектов. Настройка колонок — позже." });
+    note.body.append(renderActions());
+    wrap.append(note.block);
+  }
+  return wrap;
+}
+
+function renderAlternatives(rec) {
+  const { block, body } = rblock(rbTitle("Другие источники"), { accent: "#fb7132", note: "Можно выбрать вопреки рекомендации." });
+  rec.alternatives.forEach((a) => {
+    const line = el("div", { class: "cand" },
+      sevBadge(a.record_count != null ? "ok" : "info", a.kind),
+      el("code", {}, esc(a.location || "")),
+      el("span", { class: "muted" }, a.record_count != null ? `${a.record_count} зап.` : ((a.limitations && a.limitations[0]) || "не проверено")));
+    if (a.schema) line.append(el("button", { class: "act", onclick: () => chooseSource(a) }, "Выбрать"));
+    body.append(line);
+  });
+  return block;
+}
+
+function chooseSource(cand) {
+  paState.schema = JSON.parse(JSON.stringify(cand.schema));
+  toast(`Источник: ${cand.kind}`, "success");
+  const holder = el("div", {});
+  if (cand.kind === "repeated_dom") holder.append(renderFieldEditor());
+  else { const n = rblock(rbTitle("Поля"), { accent: "#a855f7", note: "JSON-источник: берутся все ключи." }); n.body.append(renderActions()); holder.append(n.block); }
+  $("#paOut").append(holder);
+  holder.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderFieldEditor() {
+  const { block, body } = rblock(rbTitle("Поля для сбора"), {
+    accent: "#a855f7",
+    note: "Правь имя, селектор (CSS или XPath), тип и трансформ. «Выбрать на странице» подставит CSS-селектор.",
+    actions: [el("button", { class: "act", onclick: addField }, "+ поле"),
+              el("button", { class: "act plain", onclick: visualSelect }, "🎯 Выбрать на странице")],
+  });
+  body.append(el("div", { class: "field", style: "margin-bottom:10px" },
+    el("label", {}, "Контейнер (CSS-селектор карточки)"),
+    el("input", { type: "text", id: "paContainer", value: paState.schema.container_selector || "" })));
+  const table = el("table", { class: "dtable", id: "paFields" });
+  table.append(el("thead", {}, el("tr", {}, ...["поле", "селектор", "тип", "источник", "трансформ", ""].map((h) => el("th", {}, h)))));
+  const tb = el("tbody", {});
+  (paState.schema.fields || []).forEach((f, i) => tb.append(fieldRow(f, i)));
+  table.append(tb);
+  body.append(el("div", { class: "dtable-wrap" }, table));
+  body.append(renderActions());
+  return block;
+}
+
+function fieldRow(f, i) {
+  const selType = el("select", {}, ...["css", "xpath"].map((t) => el("option", { value: t, ...(t === f.selector_type ? { selected: "" } : {}) }, t)));
+  const source = el("select", {}, ...PA_SOURCES.map((s) => el("option", { value: s, ...(s === f.source ? { selected: "" } : {}) }, s)));
+  const transform = el("select", {}, ...PA_TRANSFORMS.map((t) => el("option", { value: t, ...(t === (f.transform || "") ? { selected: "" } : {}) }, t || "—")));
+  return el("tr", { "data-i": i },
+    el("td", {}, el("input", { type: "text", class: "pa-f-name", value: f.name || "" })),
+    el("td", {}, el("input", { type: "text", class: "pa-f-sel", value: f.selector || "", placeholder: "h3 или .//span" })),
+    el("td", {}, selType),
+    el("td", {}, source),
+    el("td", {}, transform),
+    el("td", {}, el("button", { class: "act plain", onclick: (e) => { e.target.closest("tr").remove(); } }, "✕")));
+}
+
+function addField() {
+  const tb = $("#paFields tbody");
+  if (tb) tb.append(fieldRow({ name: "field" + (tb.children.length + 1), selector: "", selector_type: "css", source: "text" }, tb.children.length));
+}
+
+function renderActions() {
+  return el("div", { class: "row", style: "margin-top:12px" },
+    el("button", { class: "btn", onclick: runPreview }, "Проверить (preview)"),
+    el("button", { class: "btn ghost", onclick: () => paExport("csv") }, "↓ CSV"),
+    el("button", { class: "btn ghost", onclick: () => paExport("json") }, "↓ JSON"),
+    el("button", { class: "btn ghost", onclick: () => paExport("jsonl") }, "↓ JSONL"),
+    el("button", { class: "btn ghost", onclick: () => paExport("manifest") }, "↓ Manifest"));
+}
+
+function collectSchema() {
+  if (!paState.schema) return null;
+  const schema = { source_kind: paState.schema.source_kind, container_type: "css", fields: [] };
+  const container = $("#paContainer");
+  schema.container_selector = container ? container.value.trim() : (paState.schema.container_selector || "");
+  $$("#paFields tbody tr").forEach((tr) => {
+    const name = $(".pa-f-name", tr).value.trim();
+    if (!name) return;
+    const selects = $$("select", tr);
+    schema.fields.push({
+      name,
+      selector: $(".pa-f-sel", tr).value.trim(),
+      selector_type: selects[0].value,
+      source: selects[1].value,
+      transform: selects[2].value || null,
+    });
+  });
+  return schema;
+}
+
+async function runPreview() {
+  const schema = collectSchema();
+  if (!schema) { toast("Нет схемы", "error"); return; }
+  paState.schema = schema;
+  let holder = document.getElementById("paPreview");
+  if (!holder) { holder = el("div", { id: "paPreview", style: "margin-top:16px" }); $("#paOut").append(holder); }
+  await withState(holder, "Извлекаем…", async () => {
+    const d = await api("/api/parser/preview", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: paState.input, schema, limit: 25 }),
+    });
+    if (d.error) return State.error(new ApiError(d.error, d.detail));
+    return renderPreview(d);
+  });
+}
+
+function renderPreview(d) {
+  const wrap = el("div", {});
+  wrap.append(el("div", { class: "chips" },
+    el("span", { class: "chip active" }, `строк: ${d.rows.length}`),
+    el("span", { class: "chip" }, `контейнеров: ${d.container_matches}`),
+    d.assets && d.assets.length ? el("span", { class: "chip" }, `ассетов: ${d.assets.length}`) : null,
+    d.truncated ? el("span", { class: "chip" }, "первые N") : null));
+  (d.warnings || []).forEach((w) => wrap.append(finding("warn", "", w)));
+  const cols = d.columns || [];
+  const table = el("table", { class: "dtable" });
+  table.append(el("thead", {}, el("tr", {}, ...cols.map((c) => el("th", {}, `${c} (${(d.match_counts && d.match_counts[c]) || 0})`)))));
+  const tb = el("tbody", {});
+  d.rows.slice(0, 25).forEach((r) => tb.append(el("tr", {}, ...cols.map((c) => el("td", { title: r[c] || "" }, esc(r[c] || ""))))));
+  table.append(tb);
+  wrap.append(el("div", { class: "dtable-wrap" }, table));
+  return wrap;
+}
+
+async function paExport(fmt) {
+  const schema = collectSchema();
+  if (!schema) { toast("Нет схемы", "error"); return; }
+  paState.schema = schema;
+  toast("Готовим файл…");
+  try {
+    const res = await fetch("/api/parser/export?format=" + fmt, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: paState.input, schema, limit: 200 }),
+    });
+    if (!res.ok) { toast("Экспорт не удался", "error"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: fmt === "manifest" ? "assets-manifest.json" : "extract." + (fmt === "jsonl" ? "jsonl" : fmt) });
+    document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast("Файл скачивается", "success");
+  } catch (e) { toast(String(e), "error"); }
+}
+
+// Визуальный выбор: санитизированный HTML в sandbox-iframe.
+// sandbox="allow-same-origin" БЕЗ allow-scripts: remote JS не исполняется, но
+// родитель читает DOM iframe, чтобы по клику построить CSS-селектор.
+let paLastField = null;
+document.addEventListener("focusin", (e) => { if (e.target.classList && e.target.classList.contains("pa-f-sel")) paLastField = e.target; });
+
+async function visualSelect() {
+  if (!paState.input) { toast("Сначала анализ", "error"); return; }
+  toast("Готовим страницу…");
+  let d;
+  try {
+    d = await api("/api/parser/sandbox", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: paState.input }) });
+  } catch (e) { toast(String(e), "error"); return; }
+  if (d.error) { toast(d.error, "error"); return; }
+  const overlay = el("div", { class: "pa-visual" });
+  // iframe opaque-origin: allow-scripts БЕЗ allow-same-origin. Исполняется только
+  // наш picker (чужие скрипты вырезаны сервером). Родитель НЕ читает DOM iframe —
+  // получает селектор строго через postMessage.
+  const frame = el("iframe", { class: "pa-visual-frame", sandbox: "allow-scripts", srcdoc: d.html });
+  const bar = el("div", { class: "pa-visual-bar" },
+    el("span", {}, "Кликни по нужному элементу — подставим CSS-селектор"),
+    el("button", { class: "btn sm ghost", onclick: cleanup }, "Закрыть"));
+  overlay.append(bar, frame);
+  document.body.append(overlay);
+
+  function onMessage(ev) {
+    if (ev.source !== frame.contentWindow) return;           // только это окно
+    const data = ev.data;
+    if (!data || data.type !== "forit-picker-select") return; // только наш тип
+    if (typeof data.selector !== "string") return;            // только строку
+    const selector = data.selector.slice(0, 300);             // ограничиваем длину
+    if (paLastField) { paLastField.value = selector; toast("Селектор: " + selector, "success"); }
+    else toast("Селектор: " + selector + " (сначала выберите поле)");
+    cleanup();
+  }
+  function cleanup() {
+    window.removeEventListener("message", onMessage);
+    overlay.remove();
+  }
+  window.addEventListener("message", onMessage);
 }
 
 // ---------- старт ----------

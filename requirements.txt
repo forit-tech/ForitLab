@@ -6,5 +6,12 @@ a2wsgi==1.10.10
 # Нужен FastAPI для multipart-загрузки файлов (POST /api/drift/reports).
 python-multipart==0.0.20
 
+# Web Parser: selector-backend A (CSS + XPath). Совместимость с Host-0
+# (CPython 3.13.14) подтверждена — lxml ставится готовым cp313 manylinux wheel
+# без компиляции. Приложение обращается к нему только через app.parser.dom
+# (абстракция ParserDOM), fallback B (html5lib+cssselect+elementpath) архитектурно возможен.
+lxml==5.3.0
+cssselect==1.2.0
+
 # Ставятся транзитивно вместе с fastapi, перечислены для прозрачности:
 #   starlette, pydantic, pydantic-core, annotated-types, typing-extensions

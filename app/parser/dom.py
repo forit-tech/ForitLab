@@ -29,7 +29,11 @@ class DomElement(Protocol):
     def get(self, name: str, default: str | None = None) -> str | None: ...
     def text(self) -> str: ...
     def inner_html(self) -> str: ...
+    def outer_html(self) -> str: ...
     def children(self) -> list["DomElement"]: ...
+    def css(self, selector: str) -> list["DomElement"]: ...
+    def xpath(self, selector: str) -> list["DomElement"]: ...
+    def xpath_raw(self, selector: str) -> list: ...
 
 
 # ---------------------------------------------------------------------------
@@ -62,8 +66,23 @@ class _LxmlElement:
 
         return "".join(_h.tostring(c, encoding="unicode") for c in self._n)
 
+    def outer_html(self) -> str:
+        from lxml import html as _h
+
+        return _h.tostring(self._n, encoding="unicode")
+
     def children(self) -> list[DomElement]:
         return [_LxmlElement(c) for c in self._n if isinstance(c.tag, str)]
+
+    def css(self, selector: str) -> list[DomElement]:
+        return [_LxmlElement(n) for n in self._n.cssselect(selector)]
+
+    def xpath(self, selector: str) -> list[DomElement]:
+        return [_LxmlElement(n) for n in self._n.xpath(selector) if hasattr(n, "tag") and isinstance(n.tag, str)]
+
+    def xpath_raw(self, selector: str) -> list:
+        """Сырые результаты XPath: элементы ИЛИ строки (атрибуты, text())."""
+        return list(self._n.xpath(selector))
 
 
 class LxmlBackend:
@@ -124,8 +143,20 @@ class _StdlibElement:
     def inner_html(self) -> str:  # stdlib-дерево не хранит исходный HTML
         return ""
 
+    def outer_html(self) -> str:
+        return ""
+
     def children(self) -> list[DomElement]:
         return [_StdlibElement(c) for c in self._n.children]
+
+    def css(self, selector: str) -> list[DomElement]:
+        raise UnsupportedSelector("stdlib backend не поддерживает CSS — нужен lxml")
+
+    def xpath(self, selector: str) -> list[DomElement]:
+        raise UnsupportedSelector("stdlib backend не поддерживает XPath — нужен lxml")
+
+    def xpath_raw(self, selector: str) -> list:
+        raise UnsupportedSelector("stdlib backend не поддерживает XPath — нужен lxml")
 
 
 class StdlibBackend:
