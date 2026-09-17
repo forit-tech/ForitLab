@@ -1736,6 +1736,8 @@ function initChaosOnce() {
   chaosReady = true;
   const go = $("#csGo");
   if (go) go.addEventListener("click", runSecurityCheck);
+  const site = $("#csSite");
+  if (site) site.addEventListener("click", runSiteAudit);
   const inp = $("#csUrl");
   if (inp) inp.addEventListener("keydown", (e) => { if (e.key === "Enter") runSecurityCheck(); });
 }
@@ -1781,6 +1783,83 @@ function renderSecurityReport(d) {
     wrap.append(card);
   });
   return wrap;
+}
+
+
+// =====================================================================
+// CHAOS · Site-wide Passive Audit (1b)
+// =====================================================================
+let csAudit = null;
+async function runSiteAudit() {
+  const url = $("#csUrl").value.trim();
+  if (!url) { toast("Вставьте URL сайта", "error"); return; }
+  const out = $("#csOut");
+  out.replaceChildren(State.loading("Запускаем проверку сайта…"));
+  let start;
+  try {
+    start = await api("/api/chaos/v2/audit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) });
+  } catch (e) { render(out, State.error(e)); return; }
+  if (start.error) { render(out, State.error(new ApiError(start.error))); return; }
+  csAudit = { job_id: start.id, cursor: start.cursor };
+  await pumpAudit(out);
+}
+async function pumpAudit(out) {
+  const bar = window.ForitKit ? ForitKit.progressBar() : null;
+  const stat = el("div", { class: "chips", style: "margin:10px 0" });
+  const cancel = el("button", { class: "btn ghost sm", onclick: async () => { try { await api(`/api/chaos/v2/audit/${csAudit.job_id}/cancel`, { method: "POST" }); } catch {} toast("Останавливаем…"); } }, "Отменить");
+  const { block } = rblock(rbTitle("Проверка сайта"), { accent: "#f43f5e", actions: [cancel] });
+  const inner = block.querySelector(".rb-body");
+  if (bar) inner.append(bar);
+  inner.append(stat);
+  out.replaceChildren(block);
+  const job = csAudit;
+  while (true) {
+    let st;
+    try {
+      st = await api(`/api/chaos/v2/audit/${job.job_id}/step`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cursor: job.cursor }) });
+    } catch (e) { render(out, State.error(e)); return; }
+    job.cursor = st.cursor;
+    const p = st.partial || {};
+    if (bar) { bar.setProgress(st.progress || 0); bar.setLabel(`${p.pages_checked || 0} проверено`); }
+    stat.replaceChildren(
+      el("span", { class: "chip active" }, `статус: ${st.status}`),
+      el("span", { class: "chip" }, `страниц: ${p.pages_checked || 0}`),
+      p.pages_failed ? el("span", { class: "chip" }, `ошибок: ${p.pages_failed}`) : null,
+      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null);
+    if (["completed", "failed", "cancelled"].includes(st.status)) { finishAudit(inner, st); return; }
+    await new Promise((r) => setTimeout(r, 130));
+  }
+}
+function finishAudit(inner, st) {
+  const p = st.partial || {};
+  const s = p.summary || {};
+  if (p.stopped_reason) inner.append(finding(p.partial ? "warn" : "info", "", `Итог: ${p.stopped_reason}`));
+  inner.append(el("div", { class: "chips", style: "margin:8px 0" },
+    el("span", { class: "muted" }, `${p.pages_checked || 0} страниц проверено · `),
+    el("span", { class: `chip ${s.high ? "active" : ""}` }, `HIGH: ${s.high || 0}`),
+    el("span", { class: "chip" }, `MEDIUM: ${s.medium || 0}`),
+    el("span", { class: "chip" }, `LOW: ${s.low || 0}`),
+    el("span", { class: "chip" }, `INFO: ${s.info || 0}`)));
+
+  const CS_SEV = { high: ["alert", "✕"], medium: ["warn", "⚠"], low: ["info", "·"], info: ["info", "·"] };
+  (p.aggregated_findings || []).forEach((a) => {
+    const [cls] = CS_SEV[a.severity] || ["info"];
+    const det = el("details", { class: "ent", style: "margin-bottom:8px" });
+    det.append(el("summary", {},
+      sevBadge(cls, a.severity.toUpperCase()), " ", el("strong", {}, a.title),
+      el("span", { class: "muted", style: "margin-left:8px" }, `${a.affected_pages} / ${a.checked_pages} страниц`)));
+    const body = el("div", { style: "padding:8px 0 0 4px" });
+    (a.examples || []).forEach((u) => body.append(el("div", { class: "mono", style: "font-size:.82rem;word-break:break-all" }, esc(u))));
+    if (a.affected_pages > a.examples.length) body.append(el("div", { class: "muted" }, `…и ещё ${a.affected_pages - a.examples.length}`));
+    det.append(body);
+    inner.append(det);
+  });
+
+  const jid = csAudit.job_id;
+  inner.append(el("div", { class: "row", style: "margin-top:12px" },
+    el("a", { class: "btn ghost", href: `/api/chaos/v2/audit/${jid}/export?format=csv`, target: "_blank" }, "↓ CSV (по страницам)"),
+    el("a", { class: "btn ghost", href: `/api/chaos/v2/audit/${jid}/export?format=json`, target: "_blank" }, "↓ JSON")));
+  if (st.status === "completed") toast(`Проверено ${p.pages_checked || 0} страниц`, "success");
 }
 
 // ---------- старт ----------
