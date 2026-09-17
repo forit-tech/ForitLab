@@ -1016,7 +1016,7 @@ function selectParserMode(mode) {
 async function runParserGo() {
   if (paMode === "extract") return runParserExtract();
   if (paMode === "crawl" || paMode === "audit") { toast("Этот режим появится в следующей субфазе", "error"); return; }
-  return runParserInspect();
+  return runParserExplore();
 }
 async function runParserInspect() {
   const input = $("#paInput").value.trim();
@@ -1441,6 +1441,116 @@ function finishCollect(holder, ui, st) {
       el("a", { class: "btn ghost", href: `/api/parser/collect/${jid}/export?format=manifest`, target: "_blank" }, "↓ Manifest")));
   }
   if (st.status === "completed") toast(`Собрано ${p.rows || 0} строк с ${p.pages || 0} страниц`, "success");
+}
+
+
+// =====================================================================
+// WEB PARSER · Explore / Request Builder (1c): URL/curl → RequestSpec → выполнить
+// =====================================================================
+const PA_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+
+async function runParserExplore() {
+  const input = $("#paInput").value.trim();
+  const out = $("#paOut");
+  if (!input) { toast("Вставьте URL или строку curl", "error"); return; }
+  paState.input = input;
+  await withState(out, "Разбираем запрос…", async () => {
+    const d = await api("/api/parser/build-request", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input }),
+    });
+    if (d.error) return State.error(new ApiError(d.error));
+    return renderRequestBuilder(d.request);
+  });
+}
+
+function renderRequestBuilder(spec) {
+  const wrap = el("div", {});
+  const method = el("select", { id: "paReqMethod" }, ...PA_METHODS.map((m) => el("option", { value: m, ...(m === spec.method ? { selected: "" } : {}) }, m)));
+  const url = el("input", { type: "text", id: "paReqUrl", value: spec.url || "" });
+  const headersText = Object.entries(spec.headers || {}).map(([k, v]) => `${k}: ${v}`).join("\n");
+  const headers = el("textarea", { id: "paReqHeaders", placeholder: "Header: value (по строке)", style: "min-height:70px" }, headersText);
+  const body = el("textarea", { id: "paReqBody", placeholder: "тело запроса (для POST/PUT)", style: "min-height:70px" }, spec.body || "");
+
+  const { block, body: bd } = rblock(rbTitle("Запрос"), { accent: "#a855f7", note: "Явный запрос как в Postman: robots не применяется, SSRF-защита остаётся. Секреты не сохраняются на сервере." });
+  bd.append(
+    el("div", { class: "row" },
+      el("div", { class: "field", style: "flex:0 0 130px" }, el("label", {}, "Метод"), method),
+      el("div", { class: "field", style: "flex:1" }, el("label", {}, "URL"), url)),
+    el("div", { class: "field" }, el("label", {}, "Заголовки"), headers),
+    el("div", { class: "field" }, el("label", {}, "Тело"), body),
+    el("div", { class: "row" },
+      el("button", { class: "btn", onclick: executeRequest }, "Выполнить →"),
+      el("button", { class: "btn ghost", onclick: () => { $("#paReqBody").value = ""; $("#paReqHeaders").value = ""; } }, "Очистить заголовки/тело")));
+  wrap.append(block);
+  wrap.append(el("div", { id: "paReqOut", style: "margin-top:14px" }));
+  return wrap;
+}
+
+function collectRequest() {
+  const headers = {};
+  ($("#paReqHeaders").value || "").split("\n").forEach((line) => {
+    const i = line.indexOf(":");
+    if (i > 0) headers[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  });
+  return {
+    method: $("#paReqMethod").value,
+    url: $("#paReqUrl").value.trim(),
+    headers,
+    body: $("#paReqBody").value || null,
+  };
+}
+
+async function executeRequest() {
+  const req = collectRequest();
+  if (!req.url) { toast("Укажите URL", "error"); return; }
+  paState.lastRequest = req;
+  await withState($("#paReqOut"), "Выполняем запрос…", async () => {
+    const d = await api("/api/parser/request", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(req),
+    });
+    if (d.error) return State.error(new ApiError(d.error, d.detail));
+    return renderRequestResponse(d);
+  });
+}
+
+function renderRequestResponse(d) {
+  const wrap = el("div", {});
+  const r = d.response;
+  const { block, body } = rblock(rbTitle(`Ответ · ${r.status}`), { accent: "#22d3ee" });
+  body.append(el("div", { class: "statgrid" },
+    statcard(ICON.status, `${r.status}`, "HTTP", r.status < 400 ? "ok" : "alert"),
+    statcard(ICON.time, `${Math.round(r.elapsed_ms)} мс`, "время"),
+    statcard(ICON.tables, `${r.size}`, "байт"),
+    statcard(ICON.api, r.source_type, "тип")));
+  body.append(el("div", { class: "muted", style: "margin-top:6px;word-break:break-all" }, `IP: ${r.resolved_ip} · ${esc(r.final_url)}`));
+  if (r.redirect_chain?.length) body.append(el("div", { class: "rb-note" }, `редиректов: ${r.redirect_chain.length}`));
+
+  // прогрессивное раскрытие: заголовки / тело / структура
+  const tabs = [];
+  if (window.ForitKit) {
+    tabs.push({ id: "headers", label: "Заголовки", render: () => ForitKit.jsonTree(r.headers) });
+    if (d.json !== undefined && d.json !== null) tabs.push({ id: "structure", label: "Структура", render: () => ForitKit.jsonTree(d.json) });
+    tabs.push({ id: "raw", label: "Тело (raw)", render: () => el("pre", { class: "code" }, r.body_preview || "(пусто)") });
+    body.append(ForitKit.tabs(tabs));
+  } else {
+    body.append(el("pre", { class: "code" }, r.body_preview || ""));
+  }
+
+  // передать в Extract (для GET — по URL; для остального пока подсказка)
+  const toExtract = el("button", { class: "btn ghost", onclick: () => handoffToExtract(r) }, "→ извлечь данные (Extract)");
+  if ((paState.lastRequest?.method || "GET") !== "GET") {
+    toExtract.disabled = true;
+    toExtract.title = "Передача не-GET запроса в Extract — в следующей итерации";
+  }
+  body.append(el("div", { class: "row", style: "margin-top:12px" }, toExtract));
+  wrap.append(block);
+  return wrap;
+}
+
+function handoffToExtract(r) {
+  $("#paInput").value = r.final_url;
+  selectParserMode("extract");
+  runParserExtract();
 }
 
 // ---------- старт ----------

@@ -137,6 +137,69 @@ def preview(payload: PreviewRequest) -> dict:
     return _run_preview(text, base_url, schema, payload.limit)
 
 
+class RequestModel(BaseModel):
+    method: str = "GET"
+    url: str
+    headers: dict[str, str] = Field(default_factory=dict)
+    cookies: dict[str, str] = Field(default_factory=dict)
+    body: str | None = None
+    content_type: str | None = None
+
+
+@router.post("/build-request", summary="URL/cURL → RequestSpec (1c)")
+def build_request(payload: AnalyzeRequest) -> dict:
+    from ...parser.inputs import detect_input
+    from ...parser.models import InputKind, RequestSpec
+
+    spec = detect_input(payload.input)
+    if spec.kind == InputKind.CURL and spec.request:
+        req = spec.request
+    elif spec.kind == InputKind.URL:
+        req = RequestSpec(method="GET", url=spec.url or "")
+    else:
+        return {"error": "Ожидается URL или строка curl"}
+    # отдаём реальные значения — билдер редактирует их на клиенте; на сервер не пишем
+    return {"request": req.to_dict()}
+
+
+@router.post("/request", summary="Выполнить запрос и показать ответ (1c Explore)")
+def do_request(payload: RequestModel) -> dict:
+    from ...parser.models import RequestSpec, SourceType
+
+    spec = RequestSpec(
+        method=payload.method.upper() or "GET",
+        url=payload.url,
+        headers=dict(payload.headers),
+        cookies=dict(payload.cookies),
+        body=payload.body,
+        content_type=payload.content_type,
+    )
+    headers = dict(spec.headers)
+    if spec.content_type and not any(k.lower() == "content-type" for k in headers):
+        headers["Content-Type"] = spec.content_type
+    if spec.cookies and not any(k.lower() == "cookie" for k in headers):
+        headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in spec.cookies.items())
+    body = spec.body.encode("utf-8") if isinstance(spec.body, str) else spec.body
+
+    try:
+        # Явный запрос, построенный пользователем (как в Postman) — robots не применяем,
+        # но SSRF/pinning остаются. Секреты не логируются; в ответе — маскируются.
+        resp = HttpClient().request(spec.method, spec.url, headers=headers, body=body, respect_robots=False)
+    except (UnsafeUrlError, FetchError) as exc:
+        return {"error": exc.message, "detail": exc.detail, "request": spec.to_masked()}
+
+    stype = source_type_from(resp.content_type, resp.body)
+    from ...parser.inspect import _response_view
+
+    result = {"request": spec.to_masked(), "response": _response_view(resp, stype).to_dict()}
+    if stype in (SourceType.JSON, SourceType.JSONL):
+        try:
+            result["json"] = json.loads(resp.text)
+        except (json.JSONDecodeError, ValueError):
+            result["json"] = None
+    return result
+
+
 @router.post("/sandbox", summary="Санитизированный HTML для визуального выбора (1b)")
 def sandbox(payload: AnalyzeRequest) -> dict:
     try:
