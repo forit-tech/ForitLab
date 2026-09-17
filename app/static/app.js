@@ -108,7 +108,7 @@ function navigate(view) {
   if (view === "finder") initFinderOnce();
   if (view === "burner") initBurnerOnce();
   if (view === "unicode") initUnicodeOnce();
-  if (view === "chaos") { buildChaosUrl(); showChaosHandoff(); }
+  if (view === "chaos") { buildChaosUrl(); initChaosOnce(); showChaosHandoff(); }
   if (view === "parser") initParserOnce();
 }
 window.addEventListener("hashchange", () => navigate(location.hash.slice(1)));
@@ -1605,6 +1605,7 @@ function showChaosHandoff() {
   let url = null;
   try { url = sessionStorage.getItem("forit-chaos-target"); sessionStorage.removeItem("forit-chaos-target"); } catch {}
   if (!url) return;
+  const inp = $("#csUrl"); if (inp) { inp.value = url; runSecurityCheck(); return; }
   const out = $("#chOut");
   if (!out) return;
   const note = el("div", { class: "rblock", style: "--tacc:#f43f5e" });
@@ -1722,6 +1723,64 @@ async function finishCrawl(inner, st) {
     el("a", { class: "btn", href: `/api/parser/crawl/${jid}/export?format=csv`, target: "_blank" }, `↓ CSV (${rows.length})`),
     el("a", { class: "btn ghost", href: `/api/parser/crawl/${jid}/export?format=json`, target: "_blank" }, "↓ JSON")));
   if (st.status === "completed") toast(`Обойдено ${p.pages || 0} страниц`, "success");
+}
+
+
+// =====================================================================
+// CHAOS · Passive Security Check (1a)
+// =====================================================================
+let chaosReady = false;
+const CS_SEV = { high: ["alert", "✕"], medium: ["warn", "⚠"], low: ["info", "·"], info: ["info", "·"] };
+function initChaosOnce() {
+  if (chaosReady) return;
+  chaosReady = true;
+  const go = $("#csGo");
+  if (go) go.addEventListener("click", runSecurityCheck);
+  const inp = $("#csUrl");
+  if (inp) inp.addEventListener("keydown", (e) => { if (e.key === "Enter") runSecurityCheck(); });
+}
+async function runSecurityCheck() {
+  const url = $("#csUrl").value.trim();
+  if (!url) { toast("Вставьте URL сайта", "error"); return; }
+  await withState($("#csOut"), "Проверяем сайт…", async () => {
+    const d = await api("/api/chaos/v2/check", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }),
+    });
+    if (d.error) return State.error(new ApiError(d.error, d.detail));
+    return renderSecurityReport(d);
+  });
+}
+function renderSecurityReport(d) {
+  const wrap = el("div", {});
+  const s = d.summary || {};
+  const worst = s.high ? "alert" : s.medium ? "warn" : (s.low || s.info) ? "info" : "ok";
+  wrap.append(el("div", { class: `verdict ${worst}` },
+    el("span", { class: "big" }, d.https ? "🔒" : "⚠"),
+    el("span", {}, d.https ? `HTTPS · ${d.final_url}` : `Без HTTPS · ${d.final_url}`)));
+
+  wrap.append(el("div", { class: "chips", style: "margin-bottom:14px" },
+    el("span", { class: `chip ${s.high ? "active" : ""}` }, `HIGH: ${s.high || 0}`),
+    el("span", { class: "chip" }, `MEDIUM: ${s.medium || 0}`),
+    el("span", { class: "chip" }, `LOW: ${s.low || 0}`),
+    el("span", { class: "chip" }, `INFO: ${s.info || 0}`)));
+
+  if (!d.findings.length) {
+    wrap.append(el("div", { class: "state" }, el("div", { class: "ico" }, "✓"), "Очевидных пассивных проблем не найдено."));
+    return wrap;
+  }
+  d.findings.forEach((f) => {
+    const [cls, mark] = CS_SEV[f.severity] || ["info", "·"];
+    const card = el("div", { class: "ent", style: "margin-bottom:10px" });
+    card.append(el("div", { class: "ent-top" },
+      el("div", { class: "ent-meta" }, sevBadge(cls, f.severity.toUpperCase()), el("strong", {}, f.title)),
+      el("span", { class: "muted mono" }, f.category)));
+    card.append(el("dl", { class: "kv kv-wide" },
+      el("dt", { class: "muted" }, "Обнаружено"), el("dd", {}, esc(f.evidence)),
+      el("dt", { class: "muted" }, "Почему важно"), el("dd", {}, esc(f.why)),
+      el("dt", { class: "muted" }, "Как исправить"), el("dd", {}, esc(f.recommendation))));
+    wrap.append(card);
+  });
+  return wrap;
 }
 
 // ---------- старт ----------

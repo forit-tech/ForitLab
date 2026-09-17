@@ -351,11 +351,29 @@
         <div class="th-num">06</div>
         <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
         <div class="th-text">
-          <div class="eyebrow">Chaos API · стресс клиента</div>
-          <h2>Сломай свой клиент</h2>
-          <p>Собери эндпоинт, который ведёт себя как мудак: задержки, 5xx, битый JSON, гигантский ответ, враждебные заголовки. Проверь, переживёт ли клиент реальную жизнь.</p>
+          <div class="eyebrow">Chaos · безопасность сайта</div>
+          <h2>Проверь свой сайт</h2>
+          <p>Вставь URL — Lab покажет очевидные проблемы безопасности без атаки на сайт: HTTPS, security-заголовки, cookies, CORS, раскрытие технологий, смешанный контент.</p>
         </div>
       </div>
+
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">chaos://check</span></div>
+        <div class="console-body">
+          <div class="field" style="margin-bottom:12px">
+            <label>URL сайта</label>
+            <input type="url" id="csUrl" placeholder="https://example.com">
+          </div>
+          <div class="c-actions">
+            <button class="btn" id="csGo">Проверить →</button>
+            <span class="muted">Только пассивная проверка (чтение ответа), без атаки · SSRF-защита включена</span>
+          </div>
+        </div>
+      </div>
+      <div id="csOut"></div>
+
+      <details class="cs-legacy">
+        <summary>Генератор плохих ответов (mock) — прежний Chaos</summary>
       <div class="console">
         <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">chaos://constructor</span></div>
         <div class="console-body">
@@ -392,6 +410,7 @@
         </div>
       </div>
       <div id="chOut"></div>
+      </details>
     </section>
   </main>
 

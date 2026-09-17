@@ -93,6 +93,9 @@ def create_app() -> FastAPI:
     app.include_router(parser_router)
     app.include_router(apifinder_router)
     app.include_router(chaos_router)
+    from .chaos.router import router as chaos_v2_router
+
+    app.include_router(chaos_v2_router)
 
     # Веб-интерфейс. Отдаём одностраничное приложение из app/static.
     # API-роуты уже подключены выше, так что StaticFiles на корне их не затеняет.
