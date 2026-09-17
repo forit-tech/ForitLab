@@ -1183,6 +1183,7 @@ function renderFieldEditor() {
   table.append(tb);
   body.append(el("div", { class: "dtable-wrap" }, table));
   body.append(renderActions());
+  body.append(renderCollectBar());
   return block;
 }
 
@@ -1326,6 +1327,120 @@ async function visualSelect() {
     overlay.remove();
   }
   window.addEventListener("message", onMessage);
+}
+
+
+// =====================================================================
+// WEB PARSER · Multi-page collection (1d): каталог из N страниц → dataset
+// =====================================================================
+let paCollect = null; // {job_id, cursor, cancelled}
+
+// добавляем кнопку сбора в набор действий Extract (только для URL-источника)
+function renderCollectBar() {
+  const isUrl = /^https?:\/\/\S+$/i.test((paState.input || "").trim());
+  const box = el("div", { class: "row", style: "margin-top:10px" });
+  const btn = el("button", { class: "btn", onclick: startCollect }, "🕷 Собрать все страницы");
+  if (!isUrl) {
+    btn.disabled = true;
+    btn.title = "Многостраничный сбор доступен только для URL-источника";
+  }
+  box.append(btn, el("span", { class: "muted", style: "align-self:center" },
+    isUrl ? "Обойдёт пагинацию и соберёт все страницы в один датасет" : "Вставьте URL каталога, чтобы собрать несколько страниц"));
+  return box;
+}
+
+async function startCollect() {
+  const schema = collectSchema();
+  if (!schema) { toast("Нет схемы", "error"); return; }
+  paState.schema = schema;
+  let holder = document.getElementById("paCollectOut");
+  if (!holder) { holder = el("div", { id: "paCollectOut", style: "margin-top:16px" }); $("#paOut").append(holder); }
+  holder.replaceChildren(State.loading("Запускаем сбор…"));
+  let start;
+  try {
+    start = await api("/api/parser/collect", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: paState.input, schema, pagination: "auto" }),
+    });
+  } catch (e) { render(holder, State.error(e)); return; }
+  if (start.error) { render(holder, State.error(new ApiError(start.error))); return; }
+  paCollect = { job_id: start.id, cursor: start.cursor, cancelled: false };
+  await pumpCollect(holder);
+}
+
+function collectUI(holder) {
+  const bar = ForitKit ? ForitKit.progressBar() : null;
+  const stat = el("div", { class: "chips", style: "margin:10px 0" });
+  const cancel = el("button", { class: "btn ghost sm", onclick: cancelCollect }, "Отменить");
+  const body = el("div", {});
+  const { block } = rblock(rbTitle("Сбор каталога"), { accent: "#22d3ee", actions: [cancel] });
+  const inner = block.querySelector(".rb-body");
+  if (bar) inner.append(bar);
+  inner.append(stat, body);
+  holder.replaceChildren(block);
+  return { bar, stat, body };
+}
+
+async function cancelCollect() {
+  if (!paCollect) return;
+  paCollect.cancelled = true;
+  try { await api(`/api/parser/collect/${paCollect.job_id}/cancel`, { method: "POST" }); } catch {}
+  toast("Останавливаем…");
+}
+
+async function pumpCollect(holder) {
+  const ui = collectUI(holder);
+  const job = paCollect;
+  while (true) {
+    let st;
+    try {
+      st = await api(`/api/parser/collect/${job.job_id}/step`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cursor: job.cursor }),
+      });
+    } catch (e) { render(holder, State.error(e)); return; }
+    job.cursor = st.cursor;
+    updateCollectUI(ui, st);
+    if (["completed", "failed", "cancelled"].includes(st.status)) { finishCollect(holder, ui, st); return; }
+    if (job.cancelled && st.status === "running") { /* отмена уедет следующим статусом */ }
+    await new Promise((r) => setTimeout(r, 120));
+  }
+}
+
+function updateCollectUI(ui, st) {
+  const p = st.partial || {};
+  if (ui.bar) { ui.bar.setProgress(st.progress || 0); ui.bar.setLabel(`${p.pages || 0} стр · ${p.rows || 0} строк`); }
+  ui.stat.replaceChildren(
+    el("span", { class: "chip active" }, `статус: ${st.status}`),
+    el("span", { class: "chip" }, `страниц: ${p.pages || 0}`),
+    el("span", { class: "chip" }, `строк: ${p.rows || 0}`),
+    p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null);
+}
+
+function finishCollect(holder, ui, st) {
+  const p = st.partial || {};
+  const body = ui.body;
+  body.replaceChildren();
+  if (p.stopped_reason) body.append(finding(p.partial ? "warn" : "info", "", `Остановка: ${p.stopped_reason}`));
+  (st.errors || []).slice(0, 5).forEach((e) => body.append(finding("warn", "", e)));
+
+  // schema drift между страницами
+  if (p.schema_drift && p.schema_drift.length) {
+    body.append(el("div", { class: "rb-note", style: "margin-top:6px" }, "Дрейф схемы между страницами:"));
+    p.schema_drift.forEach((d) => body.append(finding(
+      d.mixed_types ? "warn" : "ok", d.field,
+      `заполнено ${d.present_pct}% · тип: ${d.dominant_type}${d.mixed_types ? " (смешанные!)" : ""}`)));
+  }
+
+  // экспорт собранного датасета
+  if (st.status === "completed" || (p.rows || 0) > 0) {
+    const jid = paCollect.job_id;
+    body.append(el("div", { class: "row", style: "margin-top:12px" },
+      el("a", { class: "btn", href: `/api/parser/collect/${jid}/export?format=csv`, target: "_blank" }, `↓ CSV (${p.rows || 0})`),
+      el("a", { class: "btn ghost", href: `/api/parser/collect/${jid}/export?format=json`, target: "_blank" }, "↓ JSON"),
+      el("a", { class: "btn ghost", href: `/api/parser/collect/${jid}/export?format=jsonl`, target: "_blank" }, "↓ JSONL"),
+      el("a", { class: "btn ghost", href: `/api/parser/collect/${jid}/export?format=manifest`, target: "_blank" }, "↓ Manifest")));
+  }
+  if (st.status === "completed") toast(`Собрано ${p.rows || 0} строк с ${p.pages || 0} страниц`, "success");
 }
 
 // ---------- старт ----------

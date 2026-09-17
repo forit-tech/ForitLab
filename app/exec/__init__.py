@@ -11,6 +11,7 @@ from ..config import settings
 from .base import (
     AdvanceResult,
     Executor,
+    JobContext,
     JobPlan,
     JobState,
     JobStatus,
@@ -29,6 +30,7 @@ __all__ = [
     "StepBudget",
     "StepHandler",
     "AdvanceResult",
+    "JobContext",
     "TERMINAL",
     "ChunkedCursorExecutor",
     "FileJobStore",

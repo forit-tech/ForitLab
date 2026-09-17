@@ -82,6 +82,11 @@ class FileJobStore:
         self._dir = directory
         self._limits = limits
 
+    @property
+    def directory(self) -> Path:
+        self._ensure_dir()
+        return self._dir
+
     def new_id(self) -> str:
         return secrets.token_hex(16)
 
@@ -89,6 +94,9 @@ class FileJobStore:
         if not _ID_RE.match(job_id):
             raise ValueError("некорректный job id")
         return self._dir / f"{job_id}.json"
+
+    def _result_path(self, job_id: str) -> Path:
+        return self._dir / f"{job_id}.result.jsonl"
 
     def _lock_path(self, job_id: str) -> Path:
         return self._dir / f"{job_id}.lock"
@@ -128,6 +136,7 @@ class FileJobStore:
     def delete(self, job_id: str) -> None:
         try:
             self._path(job_id).unlink(missing_ok=True)
+            self._result_path(job_id).unlink(missing_ok=True)
         except (ValueError, OSError):
             pass
 
@@ -143,11 +152,17 @@ class FileJobStore:
             return
         files = list(self._dir.glob("*.json"))
         now = time.time()
+
+        def _drop(path: Path) -> None:
+            path.unlink(missing_ok=True)
+            # вместе с состоянием удаляем и датасет результата (иначе .result.jsonl копятся)
+            self._dir.joinpath(path.stem + ".result.jsonl").unlink(missing_ok=True)
+
         # TTL
         for path in files:
             try:
                 if self._limits.ttl_seconds > 0 and (now - path.stat().st_mtime) > self._limits.ttl_seconds:
-                    path.unlink(missing_ok=True)
+                    _drop(path)
             except OSError:
                 continue
         files = sorted(
@@ -157,15 +172,17 @@ class FileJobStore:
         )
         # лимит по количеству
         for path in files[self._limits.max_jobs :]:
-            path.unlink(missing_ok=True)
-        # лимит по общему объёму (режем самые старые)
+            _drop(path)
+        # лимит по общему объёму (режем самые старые), учитывая и датасеты
         files = sorted(self._dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         total = 0
         for path in files:
             try:
                 size = path.stat().st_size
+                result = self._dir.joinpath(path.stem + ".result.jsonl")
+                size += result.stat().st_size if result.exists() else 0
             except OSError:
                 continue
             total += size
             if total > self._limits.max_total_bytes:
-                path.unlink(missing_ok=True)
+                _drop(path)

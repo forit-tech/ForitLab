@@ -23,6 +23,7 @@ from .base import (
     TERMINAL,
     AdvanceResult,
     Executor,
+    JobContext,
     JobPlan,
     JobState,
     JobStatus,
@@ -143,8 +144,9 @@ class ChunkedCursorExecutor(Executor):
 
             params = state.internal_state.get("params", {})
             state.status = JobStatus.RUNNING
+            ctx = JobContext(job_id=state.id, result_dir=self._store.directory)
             try:
-                result: AdvanceResult = handler.advance(params, state.internal_state, budget)
+                result: AdvanceResult = handler.advance(params, state.internal_state, budget, ctx)
             except Exception as exc:  # noqa: BLE001 — падение обработчика не роняет запрос
                 state.status = JobStatus.FAILED
                 state.errors = [f"{type(exc).__name__}: {exc}"]

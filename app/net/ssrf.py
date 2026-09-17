@@ -75,7 +75,9 @@ def check_syntax(raw_url: str) -> "tuple[str, object]":
         port = parsed.port
     except ValueError as exc:
         raise UnsafeUrlError("Некорректный порт в ссылке", {"url": raw_url[:200]}) from exc
-    if port not in ALLOWED_PORTS:
+    from ..config import settings
+
+    if port not in ALLOWED_PORTS and port not in settings.scrape_extra_ports:
         raise UnsafeUrlError("Разрешены только стандартные порты 80 и 443", {"port": port})
     if parsed.username or parsed.password:
         raise UnsafeUrlError("Ссылки с логином и паролем не обрабатываются")

@@ -13,7 +13,7 @@ from app.exec.store import FileJobStore, JobStoreLimits
 class CounterHandler:
     """Считает до target по budget.max_units за шаг."""
 
-    def advance(self, params, internal_state, budget):
+    def advance(self, params, internal_state, budget, ctx):
         count = internal_state.get("count", 0)
         target = params["target"]
         count = min(target, count + budget.max_units)
@@ -26,7 +26,7 @@ class CounterHandler:
 
 
 class HugeHandler:
-    def advance(self, params, internal_state, budget):
+    def advance(self, params, internal_state, budget, ctx):
         return AdvanceResult(partial={"blob": "x" * 100000}, internal_state={}, progress=1.0, done=True)
 
 

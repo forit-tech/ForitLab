@@ -30,6 +30,20 @@ from ...parser.sanitize import build_picker_document
 
 router = APIRouter(prefix="/api/parser", tags=[TOOL_TITLE])
 
+# executor + обработчик сбора (ленивая инициализация, чтобы тесты могли подменять)
+_executor = None
+
+
+def _get_executor():
+    global _executor
+    if _executor is None:
+        from ...exec import build_default_executor
+        from ...parser.collect import KIND as COLLECT_KIND, CollectHandler
+
+        _executor = build_default_executor()
+        _executor.register(COLLECT_KIND, CollectHandler())
+    return _executor
+
 
 # --------------------------------------------------------------------------
 # загрузка источника (URL → fetch через общий HttpClient; иначе — как есть)
@@ -222,3 +236,77 @@ def _download(body: str, media: str, filename: str) -> Response:
         media_type=f"{media}; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# --------------------------------------------------------------------------
+# 1d — Multi-page collection (chunked-cursor)
+# --------------------------------------------------------------------------
+class CollectRequest(BaseModel):
+    input: str = Field(description="URL-источник (стартовая страница каталога)")
+    schema_: SchemaModel = Field(alias="schema")
+    max_pages: int | None = None
+    max_rows: int | None = None
+    allow_subdomains: bool = False
+    respect_robots: bool = True
+    pagination: str = Field(default="auto", pattern="^(auto|none)$")
+    model_config = {"populate_by_name": True}
+
+
+class StepRequest(BaseModel):
+    cursor: str | None = None
+
+
+@router.post("/collect", summary="Запустить многостраничный сбор (1d)")
+def collect_start(payload: CollectRequest) -> dict:
+    from ...parser.collect import build_plan
+
+    schema = ExtractionSchema.from_dict(payload.schema_.model_dump(by_alias=False))
+    options = {
+        "max_pages": payload.max_pages,
+        "max_rows": payload.max_rows,
+        "allow_subdomains": payload.allow_subdomains,
+        "respect_robots": payload.respect_robots,
+        "pagination": payload.pagination,
+    }
+    options = {k: v for k, v in options.items() if v is not None}
+    try:
+        plan = build_plan(payload.input, schema, options)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    state = _get_executor().start(plan)
+    return state.to_public()
+
+
+@router.post("/collect/{job_id}/step", summary="Шаг сбора (порция страниц)")
+def collect_step(job_id: str, payload: StepRequest) -> dict:
+    from ...exec import StepBudget
+
+    budget = StepBudget(max_units=999, max_ms=9000)  # реальные потолки внутри обработчика/настроек
+    return _get_executor().step(job_id, cursor=payload.cursor, budget=budget).to_public()
+
+
+@router.post("/collect/{job_id}/cancel", summary="Остановить сбор")
+def collect_cancel(job_id: str) -> dict:
+    return _get_executor().cancel(job_id).to_public()
+
+
+@router.get("/collect/{job_id}/status", summary="Статус сбора")
+def collect_status(job_id: str) -> dict:
+    return _get_executor().status(job_id).to_public()
+
+
+@router.get("/collect/{job_id}/export", response_class=PlainTextResponse, summary="Экспорт собранного датасета")
+def collect_export(job_id: str, format: str = Query(default="csv", pattern="^(csv|json|jsonl|manifest)$")) -> Response:
+    from ...exec import build_default_executor  # noqa: F401  (гарантируем каталог)
+    from ...parser.results import ResultFile
+
+    ex = _get_executor()
+    state = ex.status(job_id)  # бросит NotFound, если джобы нет
+    result = ResultFile(ex._store.directory, job_id)
+    rows = list(result.read())
+    columns = (state.internal_state.get("columns") if state.internal_state else None) or (list(rows[0].keys()) if rows else [])
+    if format == "manifest":
+        assets = [{"row": i, "url": v} for i, r in enumerate(rows) for v in r.values() if isinstance(v, str) and v.startswith(("http://", "https://"))]
+        return _download(json.dumps(assets, ensure_ascii=False, indent=2), "application/json", f"collect-{job_id}-manifest.json")
+    body, media, _ = _serialize(columns, rows, format)
+    return _download(body, media, f"collect-{job_id}.{ 'jsonl' if format=='jsonl' else format }")

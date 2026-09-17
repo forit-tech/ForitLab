@@ -107,6 +107,9 @@ class Settings:
     #: Разрешить обращения к приватным адресам. По умолчанию нет: это защита
     #: от SSRF, а не перестраховка.
     scrape_allow_private: bool = _env_bool("FORIT_SCRAPE_ALLOW_PRIVATE", False)
+    #: Доп. порты сверх 80/443. Dev-only (локальные сервера на нестандартных
+    #: портах). По умолчанию пусто — прод-безопасно, как и allow_private.
+    scrape_extra_ports: set[int] = {int(p) for p in _env_list("FORIT_SCRAPE_EXTRA_PORTS", "") if p.isdigit()}
     #: Только ASCII: HTTP-заголовки кодируются latin-1, кириллица здесь
     #: роняет запрос ещё до отправки.
     scrape_user_agent: str = os.environ.get(
@@ -133,6 +136,19 @@ class Settings:
     crawl_delay_ms: int = _env_int("FORIT_CRAWL_DELAY_MS", 200)
     #: Сколько единиц работы делает один step() (порция chunked-исполнения).
     crawl_step_max_units: int = _env_int("FORIT_CRAWL_STEP_MAX_UNITS", 10)
+
+    # --- Multi-page collection (Web Parser 1d) ----------------------------
+    #: Потолки датасета отдельно от лимита состояния джобы (jobs_max_job_bytes).
+    #: Точные значения для Host-0 уточняются пробой tools/result_limits_probe.py;
+    #: здесь консервативные дефолты, которые точно живут в рамках shared hosting.
+    collect_max_pages: int = _env_int("FORIT_COLLECT_MAX_PAGES", 50)
+    collect_max_rows: int = _env_int("FORIT_COLLECT_MAX_ROWS", 5_000)
+    collect_result_max_bytes: int = _env_int("FORIT_COLLECT_RESULT_MAX_BYTES", 16 * 1024 * 1024)
+    collect_pages_per_step: int = _env_int("FORIT_COLLECT_PAGES_PER_STEP", 3)
+    collect_step_max_ms: int = _env_int("FORIT_COLLECT_STEP_MAX_MS", 8_000)
+    collect_delay_ms: int = _env_int("FORIT_COLLECT_DELAY_MS", 200)
+    #: Останавливаемся, если свободного места в state_dir меньше порога.
+    collect_min_free_bytes: int = _env_int("FORIT_COLLECT_MIN_FREE_BYTES", 32 * 1024 * 1024)
 
     # --- API --------------------------------------------------------------
     enable_docs: bool = _env_bool("FORIT_ENABLE_DOCS", True)

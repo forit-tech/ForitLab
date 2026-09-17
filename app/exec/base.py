@@ -48,6 +48,18 @@ class StepBudget:
 
 
 @dataclass
+class JobContext:
+    """Идентичность задачи + куда писать побочный результат (датасет).
+
+    Нужен обработчикам, которые копят большой результат: он пишется в отдельный
+    файл (result_dir/<job_id>.result.jsonl), а НЕ в состояние джобы (там лимит).
+    """
+
+    job_id: str
+    result_dir: "object"  # pathlib.Path; тип нестрогий, чтобы base не тянул импорт
+
+
+@dataclass
 class AdvanceResult:
     """Что вернул обработчик за один шаг."""
 
@@ -59,10 +71,10 @@ class AdvanceResult:
 
 
 class StepHandler(Protocol):
-    """Логика конкретного вида задачи (crawl, scan…). Регистрируется в executor."""
+    """Логика конкретного вида задачи (crawl, collect, scan…). Регистрируется в executor."""
 
     def advance(
-        self, params: dict[str, Any], internal_state: dict[str, Any], budget: StepBudget
+        self, params: dict[str, Any], internal_state: dict[str, Any], budget: StepBudget, ctx: JobContext
     ) -> AdvanceResult:  # pragma: no cover - протокол
         ...
 
