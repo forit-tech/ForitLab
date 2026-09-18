@@ -49,6 +49,9 @@ def test_good_headers_no_findings():
         "Referrer-Policy": "strict-origin",
         "Permissions-Policy": "camera=()",
         "X-Frame-Options": "DENY",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
     }, cookies=["sid=1; Secure; HttpOnly; SameSite=Lax"], text="<img src='https://cdn/x.png'>")
     rep = run_checks(good, Resp("https://x.example/"), "https://x.example/")
     assert rep["findings"] == []

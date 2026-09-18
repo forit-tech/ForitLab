@@ -17,7 +17,11 @@ from pydantic import BaseModel, Field
 
 from ..net import HttpClient
 from ..net.errors import FetchError, UnsafeUrlError
+from .active_safe import check_http_methods
+from .metadata import check_robots, check_security_txt
+from .models import lower_headers, sort_findings, summarize
 from .passive import run_checks
+from .tls import check_tls_origin
 
 router = APIRouter(prefix="/api/chaos/v2", tags=["Chaos"])
 
@@ -69,7 +73,67 @@ def check(payload: CheckRequest) -> dict:
         except (UnsafeUrlError, FetchError):
             http_probe = None
 
-    return run_checks(primary, http_probe, url)
+    report = run_checks(primary, http_probe, url)
+
+    # origin-level проверки (сеть) — TLS / security.txt / robots / OPTIONS.
+    origin_findings = _origin_checks(parsed)
+    if origin_findings:
+        merged = sort_findings(report["findings"] + origin_findings)
+        report["findings"] = merged
+        report["summary"] = summarize(merged)
+        report["origin_findings"] = origin_findings
+        report["checks_run"] = report["checks_run"] + ["tls", "security_txt", "robots", "options"]
+    return report
+
+
+def _origin_checks(parsed) -> list:
+    """Best-effort origin-проверки для /check. Любая сетевая ошибка → пропуск."""
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    findings: list = []
+
+    def _fetch(path: str, method: str = "GET"):
+        try:
+            return HttpClient().request(
+                method, urlunparse((parsed.scheme, parsed.netloc, path, "", "", "")), respect_robots=False)
+        except (UnsafeUrlError, FetchError):
+            return None
+
+    st = _fetch("/.well-known/security.txt")
+    if st is not None:
+        findings += check_security_txt(st.status, st.text, getattr(st, "content_type", ""), origin=origin)
+    else:
+        findings += check_security_txt(None, "", origin=origin)
+
+    rb = _fetch("/robots.txt")
+    findings += check_robots(rb.status if rb else None, rb.text if rb else None, origin=origin)
+
+    opt = _fetch("/", method="OPTIONS")
+    if opt is not None:
+        findings += check_http_methods(lower_headers(opt.headers).get("allow"), origin=origin)
+
+    if parsed.scheme == "https" and parsed.hostname:
+        try:
+            findings += check_tls_origin(parsed.hostname, parsed.port or 443)
+        except Exception:  # noqa: BLE001 — origin-проба не должна ронять ответ
+            pass
+
+    return findings
+
+
+@router.post("/tls", summary="Проверка TLS/сертификата по origin из URL")
+def tls_check(payload: CheckRequest) -> dict:
+    url = payload.url.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        url = "https://" + url
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        return {"error": "В ссылке нет имени хоста"}
+    origin = f"https://{parsed.hostname}:{parsed.port or 443}"
+    try:
+        findings = check_tls_origin(parsed.hostname, parsed.port or 443)
+    except Exception as exc:  # noqa: BLE001
+        return {"origin": origin, "error": str(exc), "findings": []}
+    return {"origin": origin, "findings": sort_findings(findings), "summary": summarize(findings)}
 
 
 # --------------------------------------------------------------------------

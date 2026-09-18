@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import time
 
+from urllib.parse import urlparse, urlunparse
+
 from ..config import settings
 from ..crawl import CrawlScope
 from ..exec.base import AdvanceResult, JobContext, JobPlan, StepBudget
@@ -19,7 +21,11 @@ from ..net import HttpClient
 from ..net.errors import FetchError, RobotsDisallowedError, UnsafeUrlError
 from ..parser.detect import source_type_from
 from ..parser.results import ResultFile
+from . import aggregate
+from .active_safe import check_http_methods
+from .metadata import check_robots, check_security_txt
 from .passive import run_checks
+from .tls import check_tls_origin
 
 KIND = "chaos.audit"
 _ORDER = {"high": 0, "medium": 1, "low": 2, "info": 3}
@@ -53,7 +59,8 @@ class SecurityAuditHandler:
     def advance(self, params: dict, state: dict, budget: StepBudget, ctx: JobContext) -> AdvanceResult:
         if "frontier" not in state:
             state.update(frontier=[[params["seed"], 0]], visited=[], checked=0, failed=0,
-                         agg={}, stopped="", columns=["url", "status", "content_type", "findings", "ids"])
+                         agg={}, stopped="", columns=["url", "status", "content_type", "findings", "ids"],
+                         origin_done=False, origin_findings=[])
 
         scope = CrawlScope.single_origin(
             params["seed"],
@@ -69,6 +76,11 @@ class SecurityAuditHandler:
         client = self._client_factory()
         errors: list[str] = []
         units = 0
+
+        # origin-level проверки (TLS/security.txt/robots/OPTIONS) — ОДИН раз на весь аудит
+        if not state["origin_done"]:
+            state["origin_findings"] = self._origin_probe(params["seed"], client)
+            state["origin_done"] = True
 
         while state["frontier"] and units < per_step and not state["stopped"]:
             if time.monotonic() > deadline:
@@ -99,23 +111,11 @@ class SecurityAuditHandler:
                 continue
 
             findings = run_checks(resp, None, url)["findings"]
-            ids = []
-            counts = {"high": 0, "medium": 0, "low": 0}
-            seen_ids = set()
-            for f in findings:
-                fid = f["id"]
-                if fid not in seen_ids:  # один id на страницу
-                    seen_ids.add(fid)
-                    ids.append(fid)
-                    a = state["agg"].setdefault(fid, {"severity": f["severity"], "title": f["title"], "affected": 0, "examples": []})
-                    a["affected"] += 1
-                    if len(a["examples"]) < 5:
-                        a["examples"].append(url)
-                    if f["severity"] in counts:
-                        counts[f["severity"]] += 1
+            aggregate.update_agg(state["agg"], url, findings)
+            ids = sorted({f["id"] for f in findings})
 
             result.append([{"url": url, "status": resp.status, "content_type": resp.content_type,
-                            "findings": len(ids), "ids": ";".join(sorted(ids))}])
+                            "findings": len(ids), "ids": ";".join(ids)}])
             state["checked"] += 1
             units += 1
 
@@ -135,13 +135,9 @@ class SecurityAuditHandler:
             state["stopped"] = state["stopped"] or "достигнут лимит страниц"
         done = (not state["frontier"]) or bool(state["stopped"])
         checked = state["checked"]
-        aggregated = [
-            {"id": fid, "severity": a["severity"], "title": a["title"],
-             "affected_pages": a["affected"], "checked_pages": checked, "examples": a["examples"][:5]}
-            for fid, a in state["agg"].items()
-        ]
-        aggregated.sort(key=lambda x: (_ORDER[x["severity"]], -x["affected_pages"]))
-        # severity counts = число РАЗНЫХ проблем сайта по уровню
+        aggregated = aggregate.finalize_pages(state["agg"], checked)
+        origin_findings = aggregate.dedupe_origin(state["origin_findings"])
+        # severity counts = число РАЗНЫХ page-проблем сайта по уровню (origin считаем отдельно)
         sev = {s: sum(1 for a in aggregated if a["severity"] == s) for s in ("high", "medium", "low", "info")}
         progress = min(1.0, (checked + state["failed"]) / max_pages) if max_pages else 1.0
         partial = {
@@ -150,7 +146,46 @@ class SecurityAuditHandler:
             "queued": len(state["frontier"]),
             "summary": sev,
             "aggregated_findings": aggregated,
+            "origin_findings": origin_findings,
             "stopped_reason": state["stopped"] or (None if not done else "весь сайт проверен"),
             "partial": bool(state["stopped"]),
         }
         return AdvanceResult(partial=partial, internal_state=state, progress=progress, done=done, errors=errors)
+
+    # ------------------------------------------------------------------
+    def _origin_probe(self, seed: str, client) -> list[dict]:
+        """Origin-level проверки ОДИН раз: TLS (если https), security.txt, robots, OPTIONS."""
+        parsed = urlparse(seed)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        findings: list[dict] = []
+
+        def _fetch(path: str, method: str = "GET"):
+            try:
+                return client.request(method, urlunparse((parsed.scheme, parsed.netloc, path, "", "", "")),
+                                      respect_robots=False)
+            except (UnsafeUrlError, FetchError, RobotsDisallowedError):
+                return None
+
+        st_resp = _fetch("/.well-known/security.txt")
+        if st_resp is not None:
+            findings += check_security_txt(st_resp.status, st_resp.text,
+                                           getattr(st_resp, "content_type", ""), origin=origin)
+        else:
+            findings += check_security_txt(None, "", origin=origin)
+
+        rb_resp = _fetch("/robots.txt")
+        findings += check_robots(rb_resp.status if rb_resp else None,
+                                 rb_resp.text if rb_resp else None, origin=origin)
+
+        opt = _fetch("/", method="OPTIONS")
+        if opt is not None:
+            allow = {k.lower(): v for k, v in (opt.headers or {}).items()}.get("allow")
+            findings += check_http_methods(allow, origin=origin)
+
+        if parsed.scheme == "https" and parsed.hostname:
+            try:
+                findings += check_tls_origin(parsed.hostname, parsed.port or 443)
+            except Exception:  # noqa: BLE001 — origin-проба не должна ронять аудит
+                pass
+
+        return findings
