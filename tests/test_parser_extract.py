@@ -168,6 +168,24 @@ def test_unsupported_selector_on_stdlib_is_explicit() -> None:
         doc.css("div")
 
 
+def test_missing_cssselect_is_dependency_error_not_bad_selector(monkeypatch) -> None:
+    """Отсутствие обязательного cssselect не маскируется под «Некорректный CSS-селектор».
+
+    div.product — корректный селектор; проблема в окружении, поэтому ждём отдельную
+    MissingDependencyError (500), а не InvalidSelector (400).
+    """
+    import sys
+
+    from app.parser.selectors import MissingDependencyError
+
+    monkeypatch.setitem(sys.modules, "cssselect", None)  # import cssselect → ImportError
+    with pytest.raises(MissingDependencyError) as ei:
+        validate("div.product", SelectorType.CSS)
+    assert "cssselect" in str(ei.value)
+    assert not isinstance(ei.value, InvalidSelector)
+    assert ei.value.status_code == 500
+
+
 # ---------- sanitize (visual selector) ----------
 def test_sanitize_strips_scripts_and_handlers() -> None:
     dirty = '<div onclick="steal()"><script>evil()</script><a href="javascript:bad()">x</a><img src="/i.jpg"></div>'
