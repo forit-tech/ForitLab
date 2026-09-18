@@ -157,15 +157,15 @@
         <div class="th-text">
           <div class="eyebrow">Web Parser · сбор данных с сайтов</div>
           <h2>Достань данные с сайта</h2>
-          <p>Вставь ссылку, HTML, JSON или строку <code>curl</code> — Lab определит источник данных и поможет собрать их в таблицу. <span class="muted">Субфаза 1a: определение источника. Извлечение полей, обход и экспорт — в следующих субфазах.</span></p>
+          <p>Вставь ссылку на страницу — Lab найдёт повторяющиеся карточки, предложит поля, покажет превью таблицы и соберёт данные со всех страниц каталога в один датасет с экспортом в CSV/JSON. <span class="muted">Запрос идёт через защищённый сетевой слой, JS не исполняется.</span></p>
         </div>
       </div>
 
       <div class="pa-modes" id="paModes" role="tablist" aria-label="Режимы Web Parser">
-        <button class="pa-mode" data-mode="extract" role="tab">Extract<small>сбор данных</small></button>
+        <button class="pa-mode active" data-mode="extract" role="tab" aria-selected="true">Extract<small>сбор данных</small></button>
         <button class="pa-mode" data-mode="crawl" role="tab">Crawl<small>обход сайта</small></button>
         <button class="pa-mode" data-mode="audit" role="tab">Audit<small>тех-поля</small></button>
-        <button class="pa-mode active" data-mode="explore" role="tab" aria-selected="true">Explore<small>разбор источника</small></button>
+        <button class="pa-mode" data-mode="explore" role="tab">Explore<small>ручной запрос · adv.</small></button>
       </div>
 
       <div class="console">

@@ -67,3 +67,43 @@ def test_syntax_accepts_standard() -> None:
     assert normalized.startswith("https://example.com/path")
     assert 443 in ALLOWED_PORTS or None in ALLOWED_PORTS
     assert "https" in ALLOWED_SCHEMES
+
+
+# ==========================================================================
+# Dev-оверрайды не должны становиться production-дефолтами (acceptance-gate).
+# Локально для fixture мы поднимали FORIT_SCRAPE_ALLOW_PRIVATE=1 и
+# FORIT_SCRAPE_EXTRA_PORTS=8199 — но безопасные значения по умолчанию обязаны
+# оставаться закрытыми, иначе Host-0 пропустит loopback/private/нестандартный порт.
+# ==========================================================================
+def test_production_defaults_are_locked_down() -> None:
+    from app.config import settings
+
+    assert settings.scrape_allow_private is False, "по умолчанию приватные адреса запрещены"
+    assert settings.scrape_extra_ports == set(), "по умолчанию нет разрешённых доп. портов"
+    assert 8199 not in ALLOWED_PORTS  # dev-порт fixture не зашит в дефолты
+
+
+def test_extra_port_rejected_without_override() -> None:
+    """Без FORIT_SCRAPE_EXTRA_PORTS адрес на 8199 (fixture-порт) отклоняется синтаксисом."""
+    from app.net.errors import UnsafeUrlError
+
+    with pytest.raises(UnsafeUrlError):
+        check_syntax("http://127.0.0.1:8199/page1.html")
+
+
+def test_loopback_blocked_by_default_even_via_client(monkeypatch):
+    """Host-0: с дефолтными настройками HttpClient не ходит на loopback/private."""
+    import socket
+
+    from app.net.client import HttpClient
+    from app.net.errors import UnsafeUrlError
+    from app.net.resolver import ResolvedAddr
+
+    class _LoopbackResolver:
+        def resolve(self, host, port=None):
+            return [ResolvedAddr(socket.AF_INET, "127.0.0.1")]
+
+    # allow_private не задаём → берётся дефолт settings (False)
+    http = HttpClient(resolver=_LoopbackResolver(), respect_robots=False)
+    with pytest.raises(UnsafeUrlError):
+        http.request("GET", "http://internal.example/secret")

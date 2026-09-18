@@ -999,7 +999,7 @@ const PA_MODE_NOTE = {
   audit: "",
   explore: "",
 };
-let paMode = "explore";
+let paMode = "extract";
 const paState = { input: "", base_url: "", schema: null };
 async function initParserOnce() {
   if (parserReady) return;
@@ -1424,17 +1424,22 @@ async function pumpCollect(holder) {
 function updateCollectUI(ui, st) {
   const p = st.partial || {};
   if (ui.bar) { ui.bar.setProgress(st.progress || 0); ui.bar.setLabel(`${p.pages || 0} стр · ${p.rows || 0} строк`); }
-  ui.stat.replaceChildren(
+  ui.stat.replaceChildren(...[
     el("span", { class: "chip active" }, `статус: ${st.status}`),
     el("span", { class: "chip" }, `страниц: ${p.pages || 0}`),
     el("span", { class: "chip" }, `строк: ${p.rows || 0}`),
-    p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null);
+    p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null,
+  ].filter(Boolean));
 }
 
 function finishCollect(holder, ui, st) {
   const p = st.partial || {};
   const body = ui.body;
   body.replaceChildren();
+  if ((st.status === "failed" || st.status === "cancelled") && (p.rows || 0) === 0) {
+    body.append(jobFailedNotice(st, 0, "Сбор"));
+    return;
+  }
   if (p.stopped_reason) body.append(finding(p.partial ? "warn" : "info", "", `Остановка: ${p.stopped_reason}`));
   (st.errors || []).slice(0, 5).forEach((e) => body.append(finding("warn", "", e)));
 
@@ -1683,19 +1688,46 @@ async function pumpCrawl(out) {
     job.cursor = st.cursor;
     const p = st.partial || {};
     if (ui.bar) { ui.bar.setProgress(st.progress || 0); ui.bar.setLabel(`${p.pages || 0} стр · ${p.broken || 0} broken`); }
-    ui.stat.replaceChildren(
+    ui.stat.replaceChildren(...[
       el("span", { class: "chip active" }, `статус: ${st.status}`),
       el("span", { class: "chip" }, `страниц: ${p.pages || 0}`),
       el("span", { class: "chip" }, `broken: ${p.broken || 0}`),
       el("span", { class: "chip" }, `redirects: ${p.redirects || 0}`),
-      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null);
+      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null,
+    ].filter(Boolean));
     if (["completed", "failed", "cancelled"].includes(st.status)) { await finishCrawl(ui.inner, st); return; }
     await new Promise((r) => setTimeout(r, 120));
   }
 }
 
+// Единый честный вывод для провалившейся / пустой задачи (crawl, audit).
+// Никакого зелёного «всё хорошо», никаких null/undefined, экспорт пустого нуля не предлагаем.
+function jobFailedNotice(st, count, label) {
+  const box = el("div", {});
+  const failed = st.status === "failed" || st.status === "cancelled";
+  const title = st.status === "cancelled" ? `${label} отменён` : failed ? `${label} не выполнен` : `${label}: нет данных`;
+  const reasons = (st.errors || []).filter(Boolean);
+  let reason = reasons[0] || (st.partial && st.partial.stopped_reason) || "";
+  reason = reason.replace(/^https?:\/\/\S+?:\s*/i, "").replace(/^\w+Error:\s*/, "").trim();
+  // человекочитаемая причина для частых случаев
+  if (/RobotsDisallowed|robots\.txt/i.test(reason)) reason = "robots.txt сайта запрещает обход этих страниц.";
+  else if (/UnsafeUrl|SSRF|приватн/i.test(reason)) reason = "адрес отклонён защитой (SSRF / приватная сеть / нестандартный порт).";
+  else if (/разрезолвить|getaddrinfo|DNS/i.test(reason)) reason = "не удалось определить адрес сайта (DNS): проверьте имя хоста.";
+  box.append(finding("alert", "", reason
+    ? `${title}: ${reason}`
+    : `${title}. Проверено страниц: ${count}. Результата для показа нет.`));
+  return box;
+}
+
 async function finishCrawl(inner, st) {
   const p = st.partial || {};
+  const pages = p.pages || 0;
+  // Провал или ноль страниц: НЕ показываем зелёный вывод и не отдаём пустой экспорт
+  if (st.status === "failed" || st.status === "cancelled" || pages === 0) {
+    inner.append(jobFailedNotice(st, pages, "Аудит"));
+    return;
+  }
+
   let rows = p.sample || [];
   try { rows = await api(`/api/parser/crawl/${paCrawl.job_id}/export?format=json`); } catch {}
 
@@ -1712,7 +1744,7 @@ async function finishCrawl(inner, st) {
     noTitle.forEach((r) => iss.body.append(finding("warn", "no title", r.url)));
     inner.append(iss.block);
   } else {
-    inner.append(finding("ok", "", "Битых ссылок и пустых title не найдено"));
+    inner.append(finding("ok", "", `Проверено страниц: ${pages}. Битых ссылок и пустых title не найдено.`));
   }
 
   // таблица страниц
@@ -1847,6 +1879,12 @@ async function pumpAudit(out) {
 function finishAudit(inner, st) {
   const p = st.partial || {};
   const s = p.summary || {};
+  const checked = p.pages_checked || 0;
+  // Провал или ноль проверенных страниц: честный отказ, без зелёных итогов и пустого экспорта
+  if (st.status === "failed" || st.status === "cancelled" || checked === 0) {
+    inner.append(jobFailedNotice(st, checked, "Проверка сайта"));
+    return;
+  }
   if (p.stopped_reason) inner.append(finding(p.partial ? "warn" : "info", "", `Итог: ${p.stopped_reason}`));
   inner.append(el("div", { class: "chips", style: "margin:8px 0" },
     el("span", { class: "muted" }, `${p.pages_checked || 0} страниц проверено · `),
@@ -1913,6 +1951,26 @@ async function runFileInspect() {
   });
 }
 function fiStat(v, l) { return el("div", { class: "statcard" }, el("div", {}, el("div", { class: "sc-v" }, v), el("div", { class: "sc-l" }, l))); }
+// Значение метаданных: короткое — как есть; крупное (XML/JSON/blob) — сворачиваем
+// в подпись типа с кнопками «показать полностью» и «копировать», не вываливая простыню.
+function fiMetaValue(m) {
+  const val = String(m.value == null ? "" : m.value);
+  if (!m.large) return el("span", { style: "word-break:break-word" }, esc(val) || el("span", { class: "muted" }, "(пусто)"));
+  const det = el("details", { class: "fi-val" });
+  const len = (m.value_length || val.length).toLocaleString("ru-RU");
+  det.append(el("summary", {}, `${m.type_label || "данные"} · ${len} символов — показать`));
+  det.append(el("pre", { class: "fi-raw" }, val.slice(0, 4000) + (val.length > 4000 ? "\n…(обрезано для показа, копируется целиком)" : "")));
+  det.append(el("button", { class: "btn ghost sm", onclick: () => copyText(val) }, "Копировать значение"));
+  return det;
+}
+function copyText(t) {
+  navigator.clipboard.writeText(t).then(() => toast("Скопировано", "success"))
+    .catch(() => toast("Не удалось скопировать", "error"));
+}
+function fiSensLine(m) {
+  const shown = m.large ? (m.type_label || "данные") : String(m.value);
+  return finding("alert", FI_CAT[m.category] || m.category, `${m.label || m.key}: ${esc(shown)}`);
+}
 function renderFileReport(d) {
   const wrap = el("div", {});
   const { block, body } = rblock(rbTitle(esc(d.name)), { accent: "#c084fc" });
@@ -1920,48 +1978,92 @@ function renderFileReport(d) {
     fiStat(d.format, "формат"),
     fiStat(d.mime, "MIME"),
     fiStat(fmtBytes(d.size_bytes), "размер"),
+    (d.width && d.height) ? fiStat(`${d.width}×${d.height}`, "px") : null,
     fiStat(d.metadata.length, "метаданных")));
   body.append(el("div", { class: "mono", style: "margin-top:8px;word-break:break-all;font-size:.8rem" }, "sha256: " + d.sha256));
   wrap.append(block);
 
-  if (d.sensitive_metadata && d.sensitive_metadata.length) {
-    const iss = rblock(rbTitle("Потенциально чувствительное", d.sensitive_metadata.length), { accent: "#f43f5e" });
-    d.sensitive_metadata.forEach((m) => iss.body.append(finding("alert", FI_CAT[m.category] || m.category, `${m.key}: ${esc(String(m.value))}`)));
-    // карта для GPS
-    const gps = d.sensitive_metadata.find((m) => m.category === "location" && /(-?\d+\.\d+).+(-?\d+\.\d+)/.test(String(m.value)));
-    if (gps) {
-      const mm = String(gps.value).match(/(-?\d+\.\d+)[^\d-]+(-?\d+\.\d+)/);
-      if (mm) iss.body.append(el("a", { class: "act", href: `https://www.openstreetmap.org/?mlat=${mm[1]}&mlon=${mm[2]}#map=15/${mm[1]}/${mm[2]}`, target: "_blank", rel: "noopener" }, "📍 показать на карте (OSM)"));
+  const sens = d.sensitive_metadata || [];
+  if (sens.length) {
+    const iss = rblock(rbTitle("Приватные данные", sens.length), { accent: "#f43f5e" });
+    iss.body.append(el("div", { class: "rb-note", style: "margin-top:0" }, "Эти поля могут деанонимизировать автора/устройство/место — их стоит убрать перед публикацией."));
+    sens.forEach((m) => iss.body.append(fiSensLine(m)));
+    // карта для GPS: собираем широту/долготу из отдельных полей
+    const lat = sens.find((m) => /latitude/i.test(m.key));
+    const lon = sens.find((m) => /longitude/i.test(m.key));
+    if (lat && lon) {
+      const la = parseFloat(lat.value), lo = parseFloat(lon.value);
+      if (isFinite(la) && isFinite(lo)) {
+        iss.body.append(el("div", { style: "margin-top:6px" },
+          el("span", { class: "mono", style: "margin-right:10px" }, `${la.toFixed(6)}, ${lo.toFixed(6)}`),
+          el("a", { class: "act", href: `https://www.openstreetmap.org/?mlat=${la}&mlon=${lo}#map=15/${la}/${lo}`, target: "_blank", rel: "noopener" }, "📍 показать на карте (OSM)")));
+      }
     }
     wrap.append(iss.block);
+  } else if (d.format !== "unknown") {
+    wrap.append(finding("ok", "", "Приватных метаданных (GPS, автор, устройство) не обнаружено."));
   }
+
   if (d.metadata.length) {
     const p = rblock(rbTitle("Все метаданные", d.metadata.length), { accent: "#22d3ee" });
-    const dl = el("dl", { class: "kv kv-wide" });
-    d.metadata.forEach((m) => { dl.append(el("dt", { class: "muted" }, `${m.key}${m.sensitive ? " ⚠" : ""}`), el("dd", {}, esc(String(m.value)))); });
-    p.body.append(dl);
+    const table = el("table", { class: "dtable" });
+    table.append(el("thead", {}, el("tr", {}, el("th", {}, "поле"), el("th", {}, "категория"), el("th", {}, "значение"))));
+    const tb = el("tbody", {});
+    d.metadata.forEach((m) => tb.append(el("tr", {},
+      el("td", { style: "white-space:nowrap" }, `${m.label || m.key}${m.sensitive ? " ⚠" : ""}`),
+      el("td", { class: "muted", style: "white-space:nowrap" }, FI_CAT[m.category] || m.category),
+      el("td", { style: "max-width:520px" }, fiMetaValue(m)))));
+    table.append(tb);
+    p.body.append(el("div", { class: "dtable-wrap" }, table));
     wrap.append(p.block);
   }
-  const actions = el("div", { class: "row", style: "margin-top:12px" });
-  if (d.can_sanitize) actions.append(el("button", { class: "btn", onclick: runSanitize }, "Очистить метаданные"));
-  else actions.append(el("span", { class: "muted" }, "Безопасная очистка для этого формата пока не поддерживается."));
-  wrap.append(actions);
+
+  // Очистка: показываем ЗАРАНЕЕ что уйдёт / что останется / чего формат не умеет
+  const actions = rblock(rbTitle("Очистка метаданных"), { accent: "#c084fc" });
+  if (d.can_sanitize) {
+    if (sens.length) {
+      actions.body.append(el("div", { class: "rb-note", style: "margin-top:0" }, "Будут удалены приватные поля:"));
+      actions.body.append(el("div", { class: "chips" }, ...sens.map((m) => el("span", { class: "chip" }, m.label || m.key))));
+    } else {
+      actions.body.append(el("div", { class: "rb-note", style: "margin-top:0" }, "Приватных полей нет, но можно вычистить все текстовые метаданные."));
+    }
+    actions.body.append(el("div", { class: "muted", style: "margin:6px 0" }, "Пиксели и размер изображения не меняются. Оригинал не трогаем — отдаём очищенную копию."));
+    actions.body.append(el("button", { class: "btn", onclick: runSanitize }, "Очистить и проверить →"));
+  } else {
+    actions.body.append(el("div", { class: "rb-note", style: "margin-top:0" },
+      `Для формата ${d.format.toUpperCase()} безопасная очистка пока не поддержана — мы не удаляем то, что не умеем удалить надёжно, чтобы не испортить документ.`));
+  }
+  wrap.append(actions.block);
   wrap.append(el("div", { id: "fiClean", style: "margin-top:14px" }));
   return wrap;
 }
 async function runSanitize() {
   const fd = new FormData(); fd.append("file", fiFile);
-  await withState($("#fiClean"), "Чистим копию…", async () => {
+  await withState($("#fiClean"), "Чистим копию и перепроверяем…", async () => {
     const res = await fetch("/api/file/sanitize", { method: "POST", body: fd });
     if (!res.ok) { const j = await res.json().catch(() => null); throw new ApiError(j?.error?.message || "Ошибка"); }
     const d = await res.json();
     const wrap = el("div", {});
-    wrap.append(el("div", { class: "verdict ok" }, el("span", { class: "big" }, "✓"), el("span", {}, `Убрано полей: ${d.removed_fields.length}`)));
-    if (d.removed_fields.length) wrap.append(el("div", { class: "chips" }, ...d.removed_fields.map((f) => el("span", { class: "chip" }, f))));
+    const afterSens = (d.after.sensitive_metadata || []).length;
+    const ok = afterSens === 0;
+    wrap.append(el("div", { class: `verdict ${ok ? "ok" : "warn"}` },
+      el("span", { class: "big" }, ok ? "✓" : "⚠"),
+      el("span", {}, ok
+        ? `Очищено. Убрано полей: ${d.removed_fields.length}. Приватных данных в копии не осталось.`
+        : `Убрано полей: ${d.removed_fields.length}, но ${afterSens} приватных поле(й) формат сохранил.`)));
+    if (d.removed_fields.length) {
+      wrap.append(el("div", { class: "rb-note" }, "Удалено:"));
+      wrap.append(el("div", { class: "chips" }, ...d.removed_fields.map((f) => el("span", { class: "chip" }, f))));
+    }
+    // before/after — перепроверка результата
+    wrap.append(el("div", { class: "chips", style: "margin-top:8px" },
+      el("span", { class: "muted" }, `метаданных: ${d.before.metadata.length} → ${d.after.metadata.length}`),
+      el("span", { class: "muted" }, `приватных: ${(d.before.sensitive_metadata || []).length} → ${afterSens}`)));
+    if (!ok && d.after.sensitive_metadata) {
+      d.after.sensitive_metadata.forEach((m) => wrap.append(finding("warn", FI_CAT[m.category] || m.category, `осталось: ${m.label || m.key}`)));
+    }
     wrap.append(el("div", { class: "row", style: "margin-top:10px" },
-      el("span", { class: "muted" }, `метаданных было: ${d.before.metadata.length} → стало: ${d.after.metadata.length}`)));
-    const dl = el("a", { class: "btn", href: "#", onclick: (e) => { e.preventDefault(); downloadClean(); } }, "↓ Скачать очищенную копию");
-    wrap.append(el("div", { class: "row", style: "margin-top:10px" }, dl));
+      el("a", { class: "btn", href: "#", onclick: (e) => { e.preventDefault(); downloadClean(); } }, "↓ Скачать очищенную копию")));
     return wrap;
   });
 }

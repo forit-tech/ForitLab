@@ -124,3 +124,33 @@ def test_head_reads_no_body(monkeypatch):
 
 def test_redirect_codes_constant():
     assert 301 in _REDIRECT_CODES and 308 in _REDIRECT_CODES
+
+
+def test_charset_from_meta_stops_at_delimiter():
+    """Регрессия: страница без charset в заголовке не должна ломать decode.
+
+    Раньше значение charset собиралось из всего буфера (фильтрацией), и на
+    <meta charset="utf-8"> в имя кодировки попадал весь текст → LookupError.
+    """
+    from app.net.client import _charset_from
+
+    body = b'<html><head><meta charset="utf-8"><title>Cats</title></head><body>hi</body></html>'
+    assert _charset_from("text/html", body) == "utf-8"
+
+
+def test_charset_from_invalid_falls_back_to_utf8():
+    from app.net.client import _charset_from
+
+    assert _charset_from("text/html; charset=definitely-not-a-codec", b"") == "utf-8"
+    assert _charset_from("text/html", b'<meta charset="bogus-enc">') == "utf-8"
+
+
+def test_response_decodes_when_header_has_no_charset(monkeypatch):
+    """Сервер без charset в Content-Type (python http.server) — тело всё равно читается."""
+    http, conns = scripted(monkeypatch, [
+        {"status": 200, "headers": [("Content-Type", "text/html")],
+         "body": '<html><head><meta charset="utf-8"><h1>Каталог</h1>'.encode("utf-8")},
+    ])
+    r = http.request("GET", "http://shop.example/catalog")
+    assert r.status == 200
+    assert "Каталог" in r.text

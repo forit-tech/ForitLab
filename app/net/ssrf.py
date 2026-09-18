@@ -15,10 +15,16 @@
 from __future__ import annotations
 
 import ipaddress
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlsplit, urlunsplit
 
 ALLOWED_SCHEMES = {"http", "https"}
 ALLOWED_PORTS = {80, 443, None}
+
+# RFC 3986 pchar + "/" + "%": оставляем уже-экранированные %XX как есть (без
+# двойного кодирования), а сырой не-ASCII превращаем в percent-encoded UTF-8.
+_PATH_SAFE = "/%:@-._~!$&'()*+,;="
+# В query дополнительно разрешены "?", "/" и разделители пар "&"/"=".
+_QUERY_SAFE = _PATH_SAFE + "?/&="
 
 
 def _candidates(addr: ipaddress._BaseAddress) -> list[ipaddress._BaseAddress]:
@@ -58,27 +64,67 @@ def classify_ip(ip: str) -> tuple[bool, str]:
     return True, ""
 
 
-def check_syntax(raw_url: str) -> "tuple[str, object]":
-    """Проверяет схему, порт, отсутствие user:pass и наличие хоста.
+def _idna_host(host: str) -> str:
+    """Хост → ASCII: IDNA для доменных имён, IP-литералы и ASCII отдаём как есть.
 
-    Возвращает (нормализованный_url, parsed). Бросает UnsafeUrlError.
-    Резолв тут НЕ делается — это отдельный шаг с резолвером.
+    SNI и заголовок Host требуют ASCII (A-label), поэтому Unicode-домен
+    (`мойсайт.рф`) переводим в `xn--...`. IP-литералы уже ASCII.
     """
     from .errors import UnsafeUrlError
 
-    parsed = urlparse(raw_url.strip())
-    if parsed.scheme not in ALLOWED_SCHEMES:
-        raise UnsafeUrlError("Разрешены только http и https", {"scheme": parsed.scheme or "(пусто)"})
-    if not parsed.hostname:
+    try:
+        host.encode("ascii")
+        return host  # уже ASCII (в т.ч. IPv4/IPv6-литералы)
+    except UnicodeEncodeError:
+        pass
+    try:
+        # Кодек 'idna' сам разбивает по точкам и делает ToASCII для каждой метки.
+        return host.encode("idna").decode("ascii")
+    except (UnicodeError, ValueError) as exc:
+        raise UnsafeUrlError(
+            "Не удалось преобразовать доменное имя (IDNA)",
+            {"host": host[:120]},
+        ) from exc
+
+
+def check_syntax(raw_url: str) -> "tuple[str, object]":
+    """Проверяет схему/порт/хост и нормализует URL до ASCII-безопасного вида.
+
+    Возвращает (нормализованный_url, parsed). Нормализация:
+    - хост → IDNA (ASCII A-label);
+    - path/query → percent-encoded UTF-8 без двойного кодирования уже-%XX;
+    - fragment отбрасывается (в HTTP-запрос он не уходит);
+    - порт и userinfo проверяются как раньше.
+
+    Резолв тут НЕ делается — это отдельный шаг с резолвером. `parsed` в ответе
+    получается разбором уже нормализованного URL, поэтому `parsed.hostname`
+    гарантированно ASCII (то, что нужно резолверу и SNI).
+    Бросает UnsafeUrlError.
+    """
+    from .errors import UnsafeUrlError
+
+    split = urlsplit(raw_url.strip())
+    if split.scheme not in ALLOWED_SCHEMES:
+        raise UnsafeUrlError("Разрешены только http и https", {"scheme": split.scheme or "(пусто)"})
+    if not split.hostname:
         raise UnsafeUrlError("В ссылке нет имени хоста", {"url": raw_url[:200]})
     try:
-        port = parsed.port
+        port = split.port
     except ValueError as exc:
         raise UnsafeUrlError("Некорректный порт в ссылке", {"url": raw_url[:200]}) from exc
     from ..config import settings
 
     if port not in ALLOWED_PORTS and port not in settings.scrape_extra_ports:
         raise UnsafeUrlError("Разрешены только стандартные порты 80 и 443", {"port": port})
-    if parsed.username or parsed.password:
+    if split.username or split.password:
         raise UnsafeUrlError("Ссылки с логином и паролем не обрабатываются")
-    return urlunparse(parsed), parsed
+
+    ascii_host = _idna_host(split.hostname)
+    netloc = f"[{ascii_host}]" if ":" in ascii_host else ascii_host  # IPv6-литерал в скобках
+    if port is not None:
+        netloc = f"{netloc}:{port}"
+
+    path = quote(split.path, safe=_PATH_SAFE)
+    query = quote(split.query, safe=_QUERY_SAFE) if split.query else ""
+    normalized = urlunsplit((split.scheme, netloc, path, query, ""))  # fragment отброшен
+    return normalized, urlsplit(normalized)

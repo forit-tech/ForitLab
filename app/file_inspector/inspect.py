@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import io
 import mimetypes
+import struct
 import zipfile
 
 from .metadata import extract_metadata
@@ -67,10 +68,54 @@ def guess_mime(name: str, fmt: str) -> str:
     return guessed or "application/octet-stream"
 
 
+def image_dimensions(fmt: str, data: bytes) -> tuple[int, int] | None:
+    """(width, height) для растровых форматов; None, если не изображение/не читается."""
+    try:
+        if fmt == "png" and data[12:16] == b"IHDR":
+            w, h = struct.unpack(">II", data[16:24])
+            return int(w), int(h)
+        if fmt == "webp":
+            # VP8X (расширенный) хранит размеры-1 в 3 байтах LE
+            idx = data.find(b"VP8X")
+            if idx != -1 and idx + 14 <= len(data):
+                b = data[idx + 8 : idx + 14]
+                w = (b[3] | (b[4] << 8) | (b[5] << 16)) + 1
+                h = 0  # для простого VP8/VP8L ниже
+            idx = data.find(b"VP8 ")
+            if idx != -1 and idx + 14 <= len(data):
+                w, h = struct.unpack("<HH", data[idx + 14 : idx + 18][:4])
+                return int(w & 0x3FFF), int(h & 0x3FFF)
+            idx = data.find(b"VP8L")
+            if idx != -1 and idx + 9 <= len(data):
+                b = data[idx + 9 : idx + 14]
+                bits = b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24)
+                return int((bits & 0x3FFF) + 1), int(((bits >> 14) & 0x3FFF) + 1)
+            return None
+        if fmt == "jpeg":
+            i, n = 2, len(data)
+            while i + 9 < n:
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = data[i + 1]
+                if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                    h, w = struct.unpack(">HH", data[i + 5 : i + 9])
+                    return int(w), int(h)
+                if marker in (0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
+                    i += 2
+                    continue
+                (length,) = struct.unpack(">H", data[i + 2 : i + 4])
+                i = i + 2 + length
+    except (struct.error, IndexError):
+        return None
+    return None
+
+
 def inspect_file(name: str, data: bytes) -> FileReport:
     """Собрать FileReport по имени и байтам файла. Не бросает на битом вводе."""
     fmt = detect_format(name, data)
     metadata = extract_metadata(fmt, data)
+    dims = image_dimensions(fmt, data)
     return FileReport(
         name=name or "file",
         size_bytes=len(data),
@@ -78,5 +123,7 @@ def inspect_file(name: str, data: bytes) -> FileReport:
         mime=guess_mime(name, fmt),
         format=fmt,
         metadata=metadata,
+        width=dims[0] if dims else None,
+        height=dims[1] if dims else None,
         can_sanitize=fmt in SANITIZABLE_FORMATS,
     )

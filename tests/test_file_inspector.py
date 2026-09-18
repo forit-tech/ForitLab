@@ -172,6 +172,31 @@ def test_tiff_gps_to_decimal() -> None:
     assert float(items["GPSLongitude"]) == pytest.approx(-122.416667, abs=1e-4)
 
 
+def test_gps_ref_signs_lat_lon_not_confused() -> None:
+    """Широта/долгота не должны меняться местами, знаки — по ref (N/S, E/W).
+
+    Карта строится по GPSLatitude→mlat, GPSLongitude→mlon; если их перепутать,
+    точка уедет в другое полушарие. San Francisco ≈ (37.8, -122.4): широта
+    положительная (N), долгота отрицательная (W).
+    """
+    from app.file_inspector.metadata import _gps_to_decimal
+
+    # одинаковые рациональные значения, разные ref → знак задаёт именно ref
+    dms = [(37, 1), (48, 1), (0, 1)]  # 37°48' = 37.8
+    assert _gps_to_decimal(dms, "N") == pytest.approx(37.8, abs=1e-4)
+    assert _gps_to_decimal(dms, "S") == pytest.approx(-37.8, abs=1e-4)
+    assert _gps_to_decimal(dms, "E") == pytest.approx(37.8, abs=1e-4)
+    assert _gps_to_decimal(dms, "W") == pytest.approx(-37.8, abs=1e-4)
+
+    # и в собранном отчёте широта — это широта (37.8), долгота — это долгота (-122.4)
+    items = {m.key: m.value for m in parse_tiff(build_exif_tiff())}
+    lat = float(items["GPSLatitude"])
+    lon = float(items["GPSLongitude"])
+    assert lat > 0 and lat == pytest.approx(37.8, abs=1e-4)   # N → +
+    assert lon < 0 and lon == pytest.approx(-122.4167, abs=1e-3)  # W → −
+    assert lat != lon  # не одно и то же значение в обоих полях
+
+
 def test_jpeg_metadata_and_sensitive() -> None:
     report = inspect_file("photo.jpg", build_exif_jpeg()).as_dict()
     by_key = {m["key"]: m for m in report["metadata"]}
@@ -198,6 +223,50 @@ def test_png_text_classification() -> None:
     # Comment не деанонимизирует → не sensitive
     assert by_key["Comment"]["category"] == "other"
     assert by_key["Comment"]["sensitive"] is False
+
+
+# ==========================================================================
+# Display-модель: крупные значения не вываливаются простынёй, есть подписи/размеры
+# ==========================================================================
+def build_drawio_png() -> bytes:
+    """PNG с tEXt mxfile — большой URL-encoded XML (как экспорт draw.io)."""
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 1280, 1090, 8, 2, 0, 0, 0))
+    blob = b"mxfile\x00" + b"%3Cmxfile%20host%3D%22app.diagrams.net%22%3E" * 400
+    mxfile = _png_chunk(b"tEXt", blob)
+    idat = _png_chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00"))
+    iend = _png_chunk(b"IEND", b"")
+    return sig + ihdr + mxfile + idat + iend
+
+
+def test_large_value_is_collapsed_not_dumped() -> None:
+    report = inspect_file("diagram.drawio.png", build_drawio_png()).as_dict()
+    mx = next(m for m in report["metadata"] if m["key"] == "mxfile")
+    assert mx["large"] is True
+    assert mx["value_kind"] == "encoded-xml"
+    assert "draw.io" in mx["type_label"]
+    assert "KB" in mx["type_label"]
+    assert len(mx["preview"]) <= 200  # превью короткое
+    assert mx["value_length"] > 1000  # но полное значение сохранено для копирования
+
+
+def test_short_value_is_not_marked_large() -> None:
+    report = inspect_file("i.png", build_text_png()).as_dict()
+    author = next(m for m in report["metadata"] if m["key"] == "Author")
+    assert author["large"] is False
+    assert author["type_label"] == ""
+    assert author["label"] == "Автор"  # человекочитаемая подпись
+
+
+def test_png_dimensions_reported() -> None:
+    report = inspect_file("diagram.drawio.png", build_drawio_png()).as_dict()
+    assert report["width"] == 1280
+    assert report["height"] == 1090
+
+
+def test_jpeg_dimensions_reported() -> None:
+    report = inspect_file("photo.jpg", build_exif_jpeg()).as_dict()
+    assert report["width"] and report["height"]
 
 
 # ==========================================================================

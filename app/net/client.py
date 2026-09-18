@@ -14,6 +14,7 @@ verification.
 
 from __future__ import annotations
 
+import codecs
 import gzip
 import http.client
 import socket
@@ -74,19 +75,42 @@ def _decompress(body: bytes, encoding: str) -> bytes:
     return body
 
 
+def _valid_charset(name: str) -> str | None:
+    """Вернуть имя кодировки, если Python её знает, иначе None."""
+    name = name.strip().strip("\"'")[:40]
+    if not name:
+        return None
+    try:
+        codecs.lookup(name)
+        return name
+    except (LookupError, ValueError):
+        return None
+
+
 def _charset_from(content_type: str, body: bytes) -> str:
+    """Определить кодировку из Content-Type или <meta>. Всегда валидный кодек.
+
+    Важно: значение читаем ДО первого разделителя, а не фильтруем весь буфер —
+    иначе на странице без charset в заголовке (напр. python http.server) в имя
+    кодировки попадал весь текст и .decode() падал LookupError.
+    """
     if "charset=" in content_type:
-        charset = content_type.split("charset=", 1)[1].split(";")[0].strip().strip('"')
-        if charset:
-            return charset[:32]
+        raw = content_type.split("charset=", 1)[1].split(";")[0]
+        valid = _valid_charset(raw)
+        if valid:
+            return valid
     head = body[:2048].lower()
     for marker in (b'charset="', b"charset='", b"charset="):
         position = head.find(marker)
-        if position != -1:
-            tail = head[position + len(marker) :]
-            value = bytes(ch for ch in tail if ch not in b"\"' >/;").decode("ascii", "ignore")
-            if value:
-                return value[:32]
+        if position == -1:
+            continue
+        tail = head[position + len(marker) :]
+        end = 0
+        while end < len(tail) and tail[end] not in b"\"' >/;":
+            end += 1
+        valid = _valid_charset(tail[:end].decode("ascii", "ignore"))
+        if valid:
+            return valid
     return "utf-8"
 
 
@@ -210,7 +234,10 @@ class HttpClient:
         last_ip = ""
 
         for _ in range(self._max_redirects + 1):
-            _, parsed = check_syntax(current)
+            # Каждый hop (в т.ч. редиректный urljoin) проходит ту же нормализацию:
+            # хост → IDNA, path/query → percent-encoded. current обновляем, чтобы
+            # final_url и redirect_chain тоже были ASCII-безопасны.
+            current, parsed = check_syntax(current)
             pinned = self._resolve_and_pin(parsed.hostname, parsed.port)
             last_ip = pinned.ip
             conn = self._open(parsed.scheme, parsed.hostname, parsed.port, pinned.ip)
