@@ -24,12 +24,12 @@
     </button>
     <nav id="nav" aria-label="Разделы">
       <button data-nav="home">Главная</button>
-      <button data-nav="parser">Parser</button>
-      <button data-nav="finder">API Finder</button>
-      <button data-nav="burner">Burner</button>
-      <button data-nav="drift">Drift</button>
-      <button data-nav="unicode">Unicode</button>
+      <button data-nav="parser">Web Parser</button>
       <button data-nav="chaos">Chaos</button>
+      <button data-nav="file">File Inspector</button>
+      <button data-nav="unicode2">Unicode</button>
+      <button data-nav="rename">Batch Rename</button>
+      <button data-nav="print">Print</button>
     </nav>
   </div></header>
   <div class="nav-scrim" id="navScrim" aria-hidden="true"></div>
@@ -413,6 +413,131 @@
       <div id="chOut"></div>
       </details>
     </section>
+    <!-- FILE INSPECTOR -->
+    <section class="view" id="view-file" style="--tacc:#c084fc">
+      <div class="tool-hero">
+        <div class="th-num">🕵</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">File Inspector · что файл знает о тебе</div>
+          <h2>Что спрятано в файле</h2>
+          <p>Перетащи файл — Lab покажет имя, тип, размер, SHA-256 и метаданные: GPS, устройство, автор, даты. Чувствительное можно вычистить и скачать очищенную копию. <span class="muted">Файл обрабатывается по запросу, в постоянное хранилище не кладётся.</span></p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">file://inspect</span></div>
+        <div class="console-body">
+          <div id="fiDrop" class="fi-drop">
+            <input type="file" id="fiFile">
+            <div class="muted">Перетащи файл сюда или выбери — JPEG / PNG / WebP / PDF / DOCX / XLSX / PPTX</div>
+          </div>
+        </div>
+      </div>
+      <div id="fiOut"></div>
+    </section>
+
+    <!-- UNICODE -->
+    <section class="view" id="view-unicode2" style="--tacc:#c084fc">
+      <div class="tool-hero">
+        <div class="th-num">🔤</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19 9.5 6h1L16 19M6 14h8"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Unicode · разбор и очистка текста</div>
+          <h2>Что не так с этой строкой</h2>
+          <p>Невидимые символы, zero-width, NBSP, bidi, smart-quotes, смешение алфавитов. Clean Copy безопасно чистит, есть нормализация и escape — с предпросмотром изменений.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">unicode://inspect</span></div>
+        <div class="console-body">
+          <div class="field"><label>Текст</label><textarea id="u2Text" placeholder="Вставь строку для разбора…"></textarea></div>
+          <div class="c-actions">
+            <button class="btn" id="u2Go">Анализировать →</button>
+            <button class="btn ghost" id="u2Clean">Clean Copy</button>
+            <select id="u2Form" class="btn ghost" style="color:var(--text)"><option>NFC</option><option>NFD</option><option>NFKC</option><option>NFKD</option></select>
+            <button class="btn ghost" id="u2Norm">Normalize</button>
+            <button class="btn ghost" id="u2Escape">Escape</button>
+            <button class="btn ghost" id="u2Unescape">Unescape</button>
+          </div>
+        </div>
+      </div>
+      <div id="u2Out"></div>
+      <div id="u2Diff" style="margin-top:12px"></div>
+      <div class="field" style="margin-top:12px"><label>Результат <span id="u2ChangeNote" class="muted"></span></label>
+        <textarea id="u2Result" readonly placeholder="результат Clean Copy / Normalize / Escape"></textarea></div>
+      <button class="btn ghost sm" onclick="u2Copy()">Копировать результат</button>
+    </section>
+
+    <!-- BATCH RENAME -->
+    <section class="view" id="view-rename" style="--tacc:#3b82f6">
+      <div class="tool-hero">
+        <div class="th-num">📁</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Batch Rename · массовое переименование</div>
+          <h2>Переименуй пачку файлов</h2>
+          <p>Правила (префикс/суффикс/замена/regex/регистр/нумерация), превью old→new, проверка конфликтов. <span class="muted">Оригиналы на компьютере не меняются — на выходе ZIP с новыми именами.</span></p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="c-label">rename://plan</span></div>
+        <div class="console-body">
+          <div class="row">
+            <div class="field"><label>Файлы (для ZIP)</label><input type="file" id="brFiles" multiple></div>
+            <div class="field"><label>…или имена (по строке, для превью)</label><textarea id="brNames" placeholder="a.txt&#10;b.txt" style="min-height:60px"></textarea></div>
+          </div>
+          <div class="rb-note" style="margin-top:0">Правила применяются по порядку сверху вниз:</div>
+          <div class="dtable-wrap"><table class="dtable"><thead><tr><th>операция</th><th>парам. 1</th><th>парам. 2</th><th></th></tr></thead><tbody id="brRules"></tbody></table></div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn ghost" id="brAddRule">+ правило</button>
+            <button class="btn" id="brApply">Применить → ZIP</button>
+          </div>
+        </div>
+      </div>
+      <div id="brOut"></div>
+    </section>
+
+    <!-- PRINT -->
+    <section class="view" id="view-print" style="--tacc:#f5b53c">
+      <div class="tool-hero">
+        <div class="th-num">🖨</div>
+        <div class="th-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M6 17h12v5H6z"/></svg></div>
+        <div class="th-text">
+          <div class="eyebrow">Print · подготовка к печати</div>
+          <h2>Подготовь к печати</h2>
+          <p>Вставь текст — Lab покажет предпросмотр печатной страницы: A4/Letter, ориентация, поля, размер шрифта, колонтитулы. Печать через браузер.</p>
+        </div>
+      </div>
+
+      <div class="pr-layout">
+        <div class="pr-controls">
+          <div class="field"><label>Заголовок (необязательно)</label><input type="text" id="prTitle" placeholder="Заголовок документа"></div>
+          <div class="field"><label>Текст</label><textarea id="prText" placeholder="Вставьте текст для печати…" style="min-height:160px"></textarea></div>
+          <div class="row">
+            <div class="field"><label>Формат</label><select id="prPaper"><option value="A4">A4</option><option value="Letter">Letter</option></select></div>
+            <div class="field"><label>Ориентация</label><select id="prOrient"><option value="portrait">книжная</option><option value="landscape">альбомная</option></select></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Поля</label><select id="prMargin"><option value="normal">обычные</option><option value="narrow">узкие</option><option value="wide">широкие</option></select></div>
+            <div class="field"><label>Размер шрифта</label><select id="prFont"><option value="12">12</option><option value="14" selected>14</option><option value="16">16</option><option value="18">18</option></select></div>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle"><input type="checkbox" id="prHeader" checked> Заголовок сверху</label>
+            <label class="toggle"><input type="checkbox" id="prDate" checked> Дата</label>
+            <label class="toggle"><input type="checkbox" id="prPageNo" checked> Номера страниц</label>
+          </div>
+          <div class="row">
+            <button class="btn" id="prPrint">Печать →</button>
+            <span class="muted">Печать выполняет браузер · точная разбивка на страницы зависит от него</span>
+          </div>
+        </div>
+        <div class="pr-preview-wrap">
+          <div class="muted" style="margin-bottom:6px">Предпросмотр</div>
+          <div id="prPreview" class="pr-page"></div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div id="toasts"></div>

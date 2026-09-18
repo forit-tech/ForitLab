@@ -135,6 +135,9 @@ main{padding-top:0}
 .tool-card:active{border-color:color-mix(in srgb,var(--tacc) 70%,transparent)}
 .tool-card .art{position:relative;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#080b11}
 .tool-card .art img{width:100%;height:100%;object-fit:contain}
+.tool-card .art-ico{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--tacc);
+  background:radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--tacc) 18%,transparent),transparent 65%)}
+.tool-card .art-ico svg{width:38%;height:38%;opacity:.92}
 .tool-card .num{position:absolute;top:11px;left:12px;z-index:2;font-family:var(--mono);font-size:.74rem;font-weight:700;color:var(--tacc);
   background:rgba(5,4,6,.6);border:1px solid color-mix(in srgb,var(--tacc) 40%,transparent);border-radius:6px;padding:2px 8px}
 .tool-card .body{padding:15px 17px 17px;display:flex;flex-direction:column;gap:10px;flex:1;border-top:1px solid var(--border)}
@@ -738,3 +741,21 @@ html.modal-open,html.modal-open body{overflow:hidden}
 .pa-visual-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;color:var(--text);
   background:var(--panel-solid);border:1px solid var(--border-hi);border-radius:12px 12px 0 0;font-size:.9rem}
 .pa-visual-frame{flex:1;width:100%;border:1px solid var(--border-hi);border-top:none;border-radius:0 0 12px 12px;background:#fff}
+
+/* ---------- Print tool ---------- */
+.pr-layout{display:grid;grid-template-columns:minmax(min(280px,100%),380px) 1fr;gap:22px;align-items:start}
+.pr-controls{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+.pr-preview-wrap{overflow:auto}
+.pr-page{background:#fff;color:#111;box-shadow:0 10px 40px rgba(0,0,0,.5);margin:0 auto;transform-origin:top center;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+.pr-page .pr-h1{font-size:1.6em;margin:0 0 .4em}
+.pr-page .pr-meta{color:#666;font-size:.82em;margin-bottom:1em;border-bottom:1px solid #ddd;padding-bottom:.4em}
+.pr-page .pr-body p{margin:0 0 .8em;white-space:pre-wrap;word-break:break-word}
+@media (max-width:900px){.pr-layout{grid-template-columns:1fr}.pr-page{width:100%!important;min-height:auto!important}}
+
+/* ---------- File Inspector drop ---------- */
+.fi-drop{position:relative;border:2px dashed var(--border-hi);border-radius:var(--radius);padding:26px;text-align:center;transition:.15s;cursor:pointer}
+.fi-drop.drag{border-color:var(--tacc);background:color-mix(in srgb,var(--tacc) 8%,transparent)}
+.fi-drop input[type=file]{display:block;margin:0 auto 10px}
+/* Batch Rename rules table inputs */
+#brRules input,#brRules select{padding:6px 8px;font-size:.85rem;min-width:90px}

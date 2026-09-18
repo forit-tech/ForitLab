@@ -89,7 +89,7 @@ const sevBadge = (sev, text) => el("span", { class: `badge ${sev}` }, text || se
 const MARK = { ok: "✓", info: "·", warn: "⚠", alert: "✕" };
 
 // ---------- роутинг ----------
-const VIEWS = ["home", "about", "parser", "harvester", "finder", "burner", "drift", "unicode", "chaos"];
+const VIEWS = ["home", "about", "parser", "chaos", "file", "unicode2", "rename", "print", "harvester", "finder", "burner", "drift", "unicode"];
 let currentView = null, prevView = null;
 function navigate(view) {
   if (!VIEWS.includes(view)) view = "home";
@@ -110,6 +110,10 @@ function navigate(view) {
   if (view === "unicode") initUnicodeOnce();
   if (view === "chaos") { buildChaosUrl(); initChaosOnce(); showChaosHandoff(); }
   if (view === "parser") initParserOnce();
+  if (view === "file") initFileInspectorOnce();
+  if (view === "unicode2") initUnicode2Once();
+  if (view === "rename") initBatchRenameOnce();
+  if (view === "print") initPrintOnce();
 }
 window.addEventListener("hashchange", () => navigate(location.hash.slice(1)));
 document.addEventListener("click", (e) => {
@@ -211,40 +215,46 @@ document.documentElement.dataset.theme = "dark";
 // =====================================================================
 // ГЛАВНАЯ
 // =====================================================================
+// Иконки для инструментов без готовой картинки (line-art в стиль tool-hero).
+const TICON = {
+  file: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><circle cx="12" cy="14" r="3"/><path d="m16.5 18.5-1.6-1.6"/></svg>`,
+  rename: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m14.5 11-3.5 3.5m0 0L8 11m3 3.5V8"/></svg>`,
+  print: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>`,
+};
 const TOOLS_META = {
-  harvester: { title: "Web Parser", sub: "Собери данные с сайта в таблицу", img: "harvester", accent: "#22d3ee", tags: ["HTML", "Table", "Dataset"] },
-  finder: { title: "API Finder", sub: "Найди бесплатные API под задачу", img: "finder", accent: "#a855f7", tags: ["API", "Free tier", "Integrations"] },
-  burner: { title: "Data Burner", sub: "Создай синтетику с дефектами", img: "burner", accent: "#fb7132", tags: ["Dataset", "Anomalies", "Test"] },
-  drift: { title: "Drift Lab", sub: "Сравни версии данных", img: "drift", accent: "#3b82f6", tags: ["Drift", "Analytics", "Insights"] },
-  unicode: { title: "Unicode Crime Lab", sub: "Найди невидимые проблемы в тексте", img: "unicode", accent: "#c084fc", tags: ["Text", "Unicode", "Validation"] },
-  chaos: { title: "Chaos API", sub: "Сломай свой клиент раньше пользователей", img: "chaos", accent: "#f43f5e", tags: ["HTTP", "Errors", "Resilience"] },
+  parser: { title: "Web Parser", sub: "Собери данные с сайта в таблицу", img: "harvester", accent: "#22d3ee", tags: ["HTML", "Table", "Dataset"] },
+  chaos: { title: "Chaos", sub: "Пассивный аудит безопасности сайта", img: "chaos", accent: "#f43f5e", tags: ["Headers", "TLS", "Cookies"] },
+  file: { title: "File Inspector", sub: "Что файл знает о тебе — и как это вычистить", icon: TICON.file, accent: "#c084fc", tags: ["Metadata", "GPS", "SHA-256"] },
+  unicode2: { title: "Unicode", sub: "Найди невидимые проблемы в тексте", img: "unicode", accent: "#a855f7", tags: ["Text", "Unicode", "Clean"] },
+  rename: { title: "Batch Rename", sub: "Переименуй пачку файлов по правилам", icon: TICON.rename, accent: "#3b82f6", tags: ["Rules", "Preview", "ZIP"] },
+  print: { title: "Print", sub: "Подготовь текст к печати через браузер", icon: TICON.print, accent: "#22c55e", tags: ["A4", "Поля", "Печать"] },
 };
 // ---------- О проекте / Как это работает ----------
 const ABOUT = [
-  { id: "harvester", name: "Web Parser", accent: "#22d3ee",
-    what: "Принимает ссылку на публичную страницу и вытаскивает всё структурированное: таблицы, повторяющиеся карточки-сущности, ссылки, картинки, формы, метаданные, JSON-LD и кандидатов в открытые API.",
+  { id: "parser", name: "Web Parser", accent: "#22d3ee",
+    what: "Принимает ссылку на публичную страницу и вытаскивает всё структурированное: таблицы, повторяющиеся карточки-сущности, ссылки, картинки, формы, метаданные и JSON-LD. Умеет обходить каталог по страницам в один датасет и повторить извлечение кодом (curl + Python).",
     why: "Быстро превратить любую веб-страницу в датасет, не открывая DevTools и не пиша парсер под каждый сайт.",
     example: "Дал ссылку на статью со списком стран → получил CSV с таблицей ВВП одним кликом." },
-  { id: "finder", name: "API Finder", accent: "#a855f7",
-    what: "Ищет бесплатные публичные API по теме на человеческом языке. Карточка каждого API: авторизация, тип бесплатности, лимиты, CORS, форматы, ссылка на документацию и дата проверки.",
-    why: "Найти источник данных, которым можно пользоваться бесплатно прямо сейчас, а не открывать 5000 каталогов и натыкаться на $49/мес.",
-    example: "Ввёл «погода» → Open-Meteo без ключа, с документацией и живой проверкой доступности." },
-  { id: "burner", name: "Data Burner", accent: "#fb7132",
-    what: "Генерирует реалистичные синтетические выгрузки с управляемыми дефектами: пропуски, выбросы, дубли, перекос классов, сломанные даты, unicode-ловушки, дрейф.",
-    why: "Протестировать свой пайплайн на данных, которые выглядят правдоподобно, но содержат именно ту грязь, которую надо проверить.",
-    example: "Собрал пару reference/current с дрейфом и сразу отправил её в Drift Lab." },
-  { id: "drift", name: "Drift Lab", accent: "#3b82f6",
-    what: "Сравнивает две выгрузки и объясняет расхождения: смена схемы, распределения (PSI, KS-тест), категории (χ², новые/пропавшие значения), рост пропусков, пересечение идентификаторов.",
-    why: "Понять, что именно изменилось между версиями данных — с человеческим объяснением, а не сухим «drift = 0.42».",
-    example: "Залил вчерашний и сегодняшний экспорт → увидел, что income начал пропадать, а age сменил тип." },
-  { id: "unicode", name: "Unicode Crime Lab", accent: "#c084fc",
-    what: "Вскрывает невидимый текстовый мусор: zero-width символы, NBSP, управляющие знаки, разницу NFC/NFD и кириллицу под видом латиницы — с подсветкой прямо в тексте.",
+  { id: "chaos", name: "Chaos", accent: "#f43f5e",
+    what: "Пассивный аудит безопасности сайта: заголовки (HSTS, CSP, X-Frame-Options), TLS, cookies, CORS, редиректы, утечки версий и раскрытие данных. Проверяет одну страницу или обходит весь сайт. Находки с уровнем и доказательством, без разрушительных запросов.",
+    why: "Увидеть слабые места конфигурации до того, как их найдёт кто-то другой — без эксплойтов и брутфорса.",
+    example: "Проверил свой лендинг → увидел отсутствие HSTS и слишком широкий CORS с доказательствами." },
+  { id: "file", name: "File Inspector", accent: "#c084fc",
+    what: "Показывает, что файл знает о тебе: имя, тип, размер, SHA-256 и метаданные — GPS-координаты, модель устройства, ПО, автор, даты. Чувствительное можно вычистить и скачать очищенную копию (оригинал не меняется).",
+    why: "Не выложить в сеть фото с домашними координатами или документ с именем автора и историей правок.",
+    example: "Перетащил фото с телефона → увидел GPS съёмки, вычистил и скачал чистую копию." },
+  { id: "unicode2", name: "Unicode", accent: "#a855f7",
+    what: "Вскрывает невидимый текстовый мусор: zero-width символы, NBSP, bidi, управляющие знаки, разницу NFC/NFD, smart-quotes и кириллицу под видом латиницы. Clean Copy безопасно чистит строку, есть нормализация и escape — с предпросмотром изменений.",
     why: "Найти причину, почему «одинаковые» строки не равны, JOIN не сходится, а поиск не находит очевидное.",
     example: "Вставил логин из формы → нашёл zero-width в конце, из-за которого не проходила авторизация." },
-  { id: "chaos", name: "Chaos API", accent: "#f43f5e",
-    what: "Эндпоинт, который намеренно ведёт себя плохо: задержки, произвольные 5xx, битый JSON, обрыв соединения, сломанная пагинация, гигантский ответ, враждебные заголовки.",
-    why: "Проверить, переживёт ли твой фронтенд/бэкенд реальную жизнь, до того как это проверят пользователи.",
-    example: "Собрал URL с задержкой 5с и 503 → проверил, корректно ли клиент показывает ошибку и ретраит." },
+  { id: "rename", name: "Batch Rename", accent: "#3b82f6",
+    what: "Массовое переименование по правилам (префикс/суффикс/замена/regex/регистр/нумерация). Сначала превью old→new и проверка конфликтов, применение — только после предпросмотра. На выходе ZIP с новыми именами; оригиналы на компьютере не трогаются.",
+    why: "Привести пачку файлов к единому порядку без ручного переименования и без риска затереть оригиналы.",
+    example: "Добавил префикс с датой и сквозную нумерацию к 40 фото → скачал готовый ZIP." },
+  { id: "print", name: "Print", accent: "#22c55e",
+    what: "Готовит текст к печати прямо в браузере: формат A4/Letter, ориентация, поля, шрифт, колонтитулы с датой и номерами страниц. Живой предпросмотр страницы и печать через диалог браузера — без загрузки файлов на сервер.",
+    why: "Быстро и опрятно распечатать заметку или документ, не открывая тяжёлый редактор.",
+    example: "Вставил заметку, выбрал A4 с полями и колонтитулом → отправил на печать одной кнопкой." },
 ];
 let aboutReady = false;
 function initAbout() {
@@ -276,9 +286,11 @@ function initHome() {
   const cards = Object.entries(TOOLS_META).map(([id, m], i) => {
     const card = el("button", { class: "tool-card", "data-nav": id });
     card.style.setProperty("--tacc", m.accent);
+    const art = m.img
+      ? `<img src="/brand/tools/${m.img}.png" alt="${esc(m.title)}" loading="lazy">`
+      : `<span class="art-ico">${m.icon}</span>`;
     card.innerHTML =
-      `<div class="art"><span class="num">0${i + 1}</span>` +
-      `<img src="/brand/tools/${m.img}.png" alt="${esc(m.title)}" loading="lazy"></div>` +
+      `<div class="art"><span class="num">0${i + 1}</span>${art}</div>` +
       `<div class="body"><h3>${esc(m.title)}</h3><p class="sub">${esc(m.sub)}</p>` +
       `<div class="tagrow">${m.tags.map((t) => `<span class="tg">${esc(t)}</span>`).join("")}</div>` +
       `<span class="go">Перейти →</span></div>`;
@@ -1766,11 +1778,12 @@ function renderSecurityReport(d) {
     el("span", { class: "chip" }, `LOW: ${s.low || 0}`),
     el("span", { class: "chip" }, `INFO: ${s.info || 0}`)));
 
-  if (!d.findings.length) {
+  const all = [...(d.findings || []), ...(d.origin_findings || [])];
+  if (!all.length) {
     wrap.append(el("div", { class: "state" }, el("div", { class: "ico" }, "✓"), "Очевидных пассивных проблем не найдено."));
     return wrap;
   }
-  d.findings.forEach((f) => {
+  all.forEach((f) => {
     const [cls, mark] = CS_SEV[f.severity] || ["info", "·"];
     const card = el("div", { class: "ent", style: "margin-bottom:10px" });
     card.append(el("div", { class: "ent-top" },
@@ -1821,11 +1834,12 @@ async function pumpAudit(out) {
     job.cursor = st.cursor;
     const p = st.partial || {};
     if (bar) { bar.setProgress(st.progress || 0); bar.setLabel(`${p.pages_checked || 0} проверено`); }
-    stat.replaceChildren(
+    stat.replaceChildren(...[
       el("span", { class: "chip active" }, `статус: ${st.status}`),
       el("span", { class: "chip" }, `страниц: ${p.pages_checked || 0}`),
       p.pages_failed ? el("span", { class: "chip" }, `ошибок: ${p.pages_failed}`) : null,
-      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null);
+      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null,
+    ].filter(Boolean));
     if (["completed", "failed", "cancelled"].includes(st.status)) { finishAudit(inner, st); return; }
     await new Promise((r) => setTimeout(r, 130));
   }
@@ -1842,6 +1856,15 @@ function finishAudit(inner, st) {
     el("span", { class: "chip" }, `INFO: ${s.info || 0}`)));
 
   const CS_SEV = { high: ["alert", "✕"], medium: ["warn", "⚠"], low: ["info", "·"], info: ["info", "·"] };
+  // origin-level findings (TLS / security.txt / robots / methods) — один раз на сайт
+  if (p.origin_findings && p.origin_findings.length) {
+    inner.append(el("div", { class: "rb-note", style: "margin-top:6px" }, "Origin-уровень (один раз на сайт):"));
+    p.origin_findings.forEach((f) => {
+      const [cls] = CS_SEV[f.severity] || ["info"];
+      inner.append(finding(cls === "alert" ? "alert" : cls === "warn" ? "warn" : "info", f.category || "", `${f.title} — ${f.evidence || ""}`));
+    });
+  }
+  if (p.aggregated_findings && p.aggregated_findings.length) inner.append(el("div", { class: "rb-note", style: "margin-top:6px" }, "По страницам:"));
   (p.aggregated_findings || []).forEach((a) => {
     const [cls] = CS_SEV[a.severity] || ["info"];
     const det = el("details", { class: "ent", style: "margin-bottom:8px" });
@@ -1860,6 +1883,351 @@ function finishAudit(inner, st) {
     el("a", { class: "btn ghost", href: `/api/chaos/v2/audit/${jid}/export?format=csv`, target: "_blank" }, "↓ CSV (по страницам)"),
     el("a", { class: "btn ghost", href: `/api/chaos/v2/audit/${jid}/export?format=json`, target: "_blank" }, "↓ JSON")));
   if (st.status === "completed") toast(`Проверено ${p.pages_checked || 0} страниц`, "success");
+}
+
+
+// =====================================================================
+// FILE INSPECTOR · что файл знает о тебе (/api/file)
+// =====================================================================
+let fiReady = false;
+let fiFile = null;
+const FI_CAT = { location: "📍 геолокация", device: "устройство", software: "софт", author: "автор", timestamps: "даты", document: "документ", other: "прочее" };
+function initFileInspectorOnce() {
+  if (fiReady) return;
+  fiReady = true;
+  const inp = $("#fiFile");
+  if (inp) inp.addEventListener("change", (e) => { fiFile = e.target.files[0]; if (fiFile) runFileInspect(); });
+  const drop = $("#fiDrop");
+  if (drop) {
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drag"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("drag"); fiFile = e.dataTransfer.files[0]; if (fiFile) runFileInspect(); });
+  }
+}
+async function runFileInspect() {
+  const fd = new FormData(); fd.append("file", fiFile);
+  await withState($("#fiOut"), "Читаем файл…", async () => {
+    const res = await fetch("/api/file/inspect", { method: "POST", body: fd });
+    if (!res.ok) { const j = await res.json().catch(() => null); throw new ApiError(j?.error?.message || "Ошибка", j?.error?.detail); }
+    return renderFileReport(await res.json());
+  });
+}
+function fiStat(v, l) { return el("div", { class: "statcard" }, el("div", {}, el("div", { class: "sc-v" }, v), el("div", { class: "sc-l" }, l))); }
+function renderFileReport(d) {
+  const wrap = el("div", {});
+  const { block, body } = rblock(rbTitle(esc(d.name)), { accent: "#c084fc" });
+  body.append(el("div", { class: "statgrid" },
+    fiStat(d.format, "формат"),
+    fiStat(d.mime, "MIME"),
+    fiStat(fmtBytes(d.size_bytes), "размер"),
+    fiStat(d.metadata.length, "метаданных")));
+  body.append(el("div", { class: "mono", style: "margin-top:8px;word-break:break-all;font-size:.8rem" }, "sha256: " + d.sha256));
+  wrap.append(block);
+
+  if (d.sensitive_metadata && d.sensitive_metadata.length) {
+    const iss = rblock(rbTitle("Потенциально чувствительное", d.sensitive_metadata.length), { accent: "#f43f5e" });
+    d.sensitive_metadata.forEach((m) => iss.body.append(finding("alert", FI_CAT[m.category] || m.category, `${m.key}: ${esc(String(m.value))}`)));
+    // карта для GPS
+    const gps = d.sensitive_metadata.find((m) => m.category === "location" && /(-?\d+\.\d+).+(-?\d+\.\d+)/.test(String(m.value)));
+    if (gps) {
+      const mm = String(gps.value).match(/(-?\d+\.\d+)[^\d-]+(-?\d+\.\d+)/);
+      if (mm) iss.body.append(el("a", { class: "act", href: `https://www.openstreetmap.org/?mlat=${mm[1]}&mlon=${mm[2]}#map=15/${mm[1]}/${mm[2]}`, target: "_blank", rel: "noopener" }, "📍 показать на карте (OSM)"));
+    }
+    wrap.append(iss.block);
+  }
+  if (d.metadata.length) {
+    const p = rblock(rbTitle("Все метаданные", d.metadata.length), { accent: "#22d3ee" });
+    const dl = el("dl", { class: "kv kv-wide" });
+    d.metadata.forEach((m) => { dl.append(el("dt", { class: "muted" }, `${m.key}${m.sensitive ? " ⚠" : ""}`), el("dd", {}, esc(String(m.value)))); });
+    p.body.append(dl);
+    wrap.append(p.block);
+  }
+  const actions = el("div", { class: "row", style: "margin-top:12px" });
+  if (d.can_sanitize) actions.append(el("button", { class: "btn", onclick: runSanitize }, "Очистить метаданные"));
+  else actions.append(el("span", { class: "muted" }, "Безопасная очистка для этого формата пока не поддерживается."));
+  wrap.append(actions);
+  wrap.append(el("div", { id: "fiClean", style: "margin-top:14px" }));
+  return wrap;
+}
+async function runSanitize() {
+  const fd = new FormData(); fd.append("file", fiFile);
+  await withState($("#fiClean"), "Чистим копию…", async () => {
+    const res = await fetch("/api/file/sanitize", { method: "POST", body: fd });
+    if (!res.ok) { const j = await res.json().catch(() => null); throw new ApiError(j?.error?.message || "Ошибка"); }
+    const d = await res.json();
+    const wrap = el("div", {});
+    wrap.append(el("div", { class: "verdict ok" }, el("span", { class: "big" }, "✓"), el("span", {}, `Убрано полей: ${d.removed_fields.length}`)));
+    if (d.removed_fields.length) wrap.append(el("div", { class: "chips" }, ...d.removed_fields.map((f) => el("span", { class: "chip" }, f))));
+    wrap.append(el("div", { class: "row", style: "margin-top:10px" },
+      el("span", { class: "muted" }, `метаданных было: ${d.before.metadata.length} → стало: ${d.after.metadata.length}`)));
+    const dl = el("a", { class: "btn", href: "#", onclick: (e) => { e.preventDefault(); downloadClean(); } }, "↓ Скачать очищенную копию");
+    wrap.append(el("div", { class: "row", style: "margin-top:10px" }, dl));
+    return wrap;
+  });
+}
+async function downloadClean() {
+  const fd = new FormData(); fd.append("file", fiFile);
+  const res = await fetch("/api/file/sanitize?download=true", { method: "POST", body: fd });
+  if (!res.ok) { toast("Не удалось", "error"); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: fiFile.name.replace(/(\.[^.]+)$/, ".clean$1") });
+  document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  toast("Скачивается", "success");
+}
+function fmtBytes(n) { if (n < 1024) return n + " B"; if (n < 1048576) return (n / 1024).toFixed(1) + " KB"; return (n / 1048576).toFixed(1) + " MB"; }
+
+
+// =====================================================================
+// UNICODE · анализ + Clean Copy / Normalize / Escape (/api/unicode2)
+// =====================================================================
+let uniReady = false;
+function initUnicode2Once() {
+  if (uniReady) return;
+  uniReady = true;
+  $("#u2Go") && $("#u2Go").addEventListener("click", runUnicode2);
+  $("#u2Clean") && $("#u2Clean").addEventListener("click", () => u2Action("clean"));
+  $("#u2Escape") && $("#u2Escape").addEventListener("click", () => u2Action("escape"));
+  $("#u2Unescape") && $("#u2Unescape").addEventListener("click", () => u2Action("unescape"));
+  $("#u2Norm") && $("#u2Norm").addEventListener("click", () => u2Action("normalize"));
+}
+async function u2post(path, body) {
+  return api("/api/unicode2/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+}
+async function runUnicode2() {
+  const text = $("#u2Text").value;
+  if (!text) { toast("Вставьте текст", "error"); return; }
+  await withState($("#u2Out"), "Анализируем…", async () => {
+    const d = await u2post("inspect", { text });
+    return renderUnicode2(text, d);
+  });
+}
+function renderUnicode2(text, d) {
+  const wrap = el("div", {});
+  wrap.append(el("div", { class: "chips", style: "margin-bottom:12px" },
+    el("span", { class: "chip active" }, `символов: ${d.length}`),
+    el("span", { class: "chip" }, `байт: ${d.bytes}`),
+    el("span", { class: `chip ${d.issues.length ? "" : "active"}` }, `находок: ${d.issues.length}`),
+    el("span", { class: "chip" }, d.normalization.is_nfc ? "NFC ✓" : "не NFC ✕")));
+
+  // подсветка текста
+  const render = el("div", { class: "uni-render" });
+  const byIndex = {};
+  d.issues.forEach((i) => (byIndex[i.index] = i));
+  [...text].forEach((ch, i) => {
+    const iss = byIndex[i];
+    if (iss) {
+      const shown = /\s|\p{C}/u.test(ch) ? `[${iss.codepoint}]` : ch;
+      render.append(el("span", { class: "uni-mark alert", title: `${iss.codepoint} ${iss.name} · ${iss.kind} → ${iss.action}` }, shown));
+    } else render.append(document.createTextNode(ch));
+  });
+  wrap.append(el("div", { class: "panel" }, el("h3", {}, "Текст с подсветкой"), render,
+    el("div", { class: "muted", style: "margin-top:8px" }, "Наведи на подсвеченный символ — код, тип и что с ним сделает Clean Copy.")));
+
+  if (d.mixed_script && d.mixed_script.length) {
+    const p = el("div", { class: "panel" }, el("h3", {}, "Смешанные системы письма"));
+    d.mixed_script.forEach((m) => p.append(finding("warn", "", `«${m.word}» — ${(m.scripts || []).join(" + ")}`)));
+    wrap.append(p);
+  }
+  if (d.issues.length) {
+    const p = el("div", { class: "panel" }, el("h3", {}, "Находки"));
+    d.issues.slice(0, 100).forEach((i) => p.append(finding(i.action === "keep" ? "info" : "warn", i.codepoint, `${i.name} · ${i.kind} → ${i.action}`)));
+    wrap.append(p);
+  }
+  return wrap;
+}
+async function u2Action(kind) {
+  const text = $("#u2Text").value;
+  if (!text) { toast("Вставьте текст", "error"); return; }
+  let d, result, note = "";
+  try {
+    if (kind === "clean") { d = await u2post("clean", { text }); result = d.cleaned; note = `изменений: ${(d.changes || []).length}`; }
+    else if (kind === "normalize") { d = await u2post("normalize", { text, form: $("#u2Form").value }); result = d.result; note = "форма " + $("#u2Form").value; }
+    else if (kind === "escape") { d = await u2post("escape", { text, mode: "escape" }); result = d.result; }
+    else if (kind === "unescape") { d = await u2post("escape", { text, mode: "unescape" }); result = d.result; }
+  } catch (e) { toast(e.message, "error"); return; }
+  const out = $("#u2Result");
+  out.value = result;
+  // preview изменений для clean
+  const box = $("#u2ChangeNote");
+  if (box) box.textContent = note;
+  toast("Готово" + (note ? " · " + note : ""), "success");
+  if (kind === "clean" && window.ForitKit) {
+    render($("#u2Diff"), ForitKit.diffView(text, result));
+  }
+}
+function u2Copy() {
+  const v = $("#u2Result").value;
+  navigator.clipboard.writeText(v).then(() => toast("Скопировано", "success")).catch(() => { $("#u2Result").select(); document.execCommand("copy"); toast("Скопировано", "success"); });
+}
+
+
+// =====================================================================
+// PRINT · подготовка к печати (frontend-only)
+// =====================================================================
+let printReady = false;
+const PR_MARGIN = { narrow: "12mm", normal: "20mm", wide: "30mm" };
+function initPrintOnce() {
+  if (printReady) return;
+  printReady = true;
+  ["prTitle", "prText", "prPaper", "prOrient", "prMargin", "prFont", "prHeader", "prDate", "prPageNo"]
+    .forEach((id) => { const n = $("#" + id); if (n) n.addEventListener("input", renderPrintPreview); });
+  const btn = $("#prPrint");
+  if (btn) btn.addEventListener("click", doPrint);
+  renderPrintPreview();
+}
+function printSettings() {
+  return {
+    title: $("#prTitle").value.trim(),
+    text: $("#prText").value,
+    paper: $("#prPaper").value,
+    orient: $("#prOrient").value,
+    margin: PR_MARGIN[$("#prMargin").value] || "20mm",
+    font: $("#prFont").value,
+    header: $("#prHeader").checked,
+    date: $("#prDate").checked,
+    pageNo: $("#prPageNo").checked,
+  };
+}
+function renderPrintPreview() {
+  const s = printSettings();
+  const page = $("#prPreview");
+  if (!page) return;
+  // размеры листа для предпросмотра (мм → примерный масштаб)
+  const dims = s.paper === "Letter" ? [216, 279] : [210, 297];
+  const [w, h] = s.orient === "landscape" ? [dims[1], dims[0]] : dims;
+  page.style.width = w + "mm";
+  page.style.minHeight = h + "mm";
+  page.style.padding = s.margin;
+  page.style.fontSize = s.font + "px";
+  page.replaceChildren();
+  if (s.header && s.title) page.append(el("h1", { class: "pr-h1" }, s.title));
+  const meta = [];
+  if (s.date) meta.push(new Date().toLocaleDateString("ru-RU"));
+  if (meta.length) page.append(el("div", { class: "pr-meta" }, meta.join(" · ")));
+  const body = el("div", { class: "pr-body" });
+  (s.text || "Вставьте текст слева — здесь появится предпросмотр печатной страницы.").split(/\n{2,}/).forEach((para) => {
+    body.append(el("p", {}, para));
+  });
+  page.append(body);
+}
+function doPrint() {
+  const s = printSettings();
+  const win = window.open("", "_blank");
+  if (!win) { toast("Браузер заблокировал окно печати", "error"); return; }
+  const dims = s.paper === "Letter" ? "letter" : "A4";
+  const paras = (s.text || "").split(/\n{2,}/).map((p) => `<p>${escHtml(p)}</p>`).join("");
+  const header = s.header && s.title ? `<h1>${escHtml(s.title)}</h1>` : "";
+  const meta = s.date ? `<div class="meta">${new Date().toLocaleDateString("ru-RU")}</div>` : "";
+  const foot = s.pageNo ? "" : "";
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(s.title || "Печать")}</title>
+    <style>
+      @page { size: ${dims} ${s.orient}; margin: ${s.margin}; }
+      html,body{margin:0}
+      body{font:${s.font}px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111}
+      h1{font-size:1.6em;margin:0 0 .4em}
+      .meta{color:#666;font-size:.82em;margin-bottom:1em;border-bottom:1px solid #ddd;padding-bottom:.4em}
+      p{margin:0 0 .8em;white-space:pre-wrap;word-break:break-word}
+      @media print { .noprint{display:none} }
+    </style></head><body>${header}${meta}${paras}${foot}</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 250);
+}
+function escHtml(s) { return String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+
+// =====================================================================
+// BATCH RENAME · план old→new (превью) → ZIP (/api/rename)
+// =====================================================================
+let brReady = false;
+let brFiles = [];       // File[] (если выбраны реальные файлы)
+let brNames = [];       // list[str] имён (из файлов или вставленных)
+function initBatchRenameOnce() {
+  if (brReady) return;
+  brReady = true;
+  $("#brFiles") && $("#brFiles").addEventListener("change", (e) => {
+    brFiles = [...e.target.files];
+    brNames = brFiles.map((f) => f.name);
+    $("#brNames").value = brNames.join("\n");
+    brPreview();
+  });
+  $("#brNames") && $("#brNames").addEventListener("input", () => {
+    brNames = $("#brNames").value.split("\n").map((s) => s.trim()).filter(Boolean);
+    brPreview();
+  });
+  $("#brAddRule") && $("#brAddRule").addEventListener("click", () => { brAddRuleRow(); brPreview(); });
+  $("#brApply") && $("#brApply").addEventListener("click", brApply);
+  brAddRuleRow();
+}
+const BR_OPS = [
+  ["prefix", "Префикс"], ["suffix", "Суффикс"], ["replace", "Найти/заменить"],
+  ["regex_replace", "Regex"], ["lowercase", "нижний регистр"], ["uppercase", "ВЕРХНИЙ"],
+  ["title", "Каждое Слово"], ["numbering", "Нумерация"],
+];
+function brAddRuleRow() {
+  const tb = $("#brRules");
+  if (!tb) return;
+  const op = el("select", { class: "br-op", onchange: brPreview }, ...BR_OPS.map(([v, l]) => el("option", { value: v }, l)));
+  const p1 = el("input", { class: "br-p1", placeholder: "текст / find / pattern / start", oninput: brPreview });
+  const p2 = el("input", { class: "br-p2", placeholder: "replace / step", oninput: brPreview });
+  const del = el("button", { class: "act plain", onclick: (e) => { e.target.closest("tr").remove(); brPreview(); } }, "✕");
+  tb.append(el("tr", {}, el("td", {}, op), el("td", {}, p1), el("td", {}, p2), el("td", {}, del)));
+}
+function brCollectRules() {
+  return $$("#brRules tr").map((tr) => {
+    const op = $(".br-op", tr).value, a = $(".br-p1", tr).value, b = $(".br-p2", tr).value;
+    if (op === "prefix" || op === "suffix") return { operation: op, params: { text: a } };
+    if (op === "replace") return { operation: op, params: { find: a, replace: b } };
+    if (op === "regex_replace") return { operation: op, params: { pattern: a, replacement: b } };
+    if (op === "numbering") return { operation: op, params: { start: parseInt(a) || 1, step: parseInt(b) || 1, padding: 3, position: "prefix" } };
+    return { operation: op, params: {} };
+  });
+}
+async function brPreview() {
+  if (!brNames.length) { $("#brOut") && $("#brOut").replaceChildren(); return; }
+  let plan;
+  try { plan = await api("/api/rename/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ names: brNames, rules: brCollectRules() }) }); }
+  catch (e) { render($("#brOut"), State.error(e)); return; }
+  render($("#brOut"), renderRenamePlan(plan));
+}
+function renderRenamePlan(plan) {
+  const wrap = el("div", {});
+  const su = plan.summary || {};
+  wrap.append(el("div", { class: "chips", style: "margin-bottom:10px" },
+    el("span", { class: "chip active" }, `файлов: ${su.total || 0}`),
+    el("span", { class: "chip" }, `изменится: ${su.changed || 0}`),
+    su.conflicts ? el("span", { class: "chip" }, `конфликтов: ${su.conflicts}`) : null,
+    su.errors ? el("span", { class: "chip" }, `ошибок: ${su.errors}`) : null,
+    el("span", { class: `chip ${plan.valid ? "active" : ""}` }, plan.valid ? "готово к применению" : "есть проблемы")));
+  const table = el("table", { class: "dtable" });
+  table.append(el("thead", {}, el("tr", {}, el("th", {}, "было"), el("th", {}, "→ станет"), el("th", {}, ""))));
+  const tb = el("tbody", {});
+  (plan.items || []).slice(0, 300).forEach((it) => tb.append(el("tr", {},
+    el("td", { title: it.old_name }, esc(it.old_name)),
+    el("td", { title: it.new_name, style: it.errors.length ? "color:var(--alert)" : (it.changed ? "color:var(--ok)" : "") }, esc(it.new_name)),
+    el("td", { class: "muted" }, it.errors.length ? esc(it.errors.join("; ")) : (it.changed ? "" : "без изменений")))));
+  table.append(tb);
+  wrap.append(el("div", { class: "dtable-wrap" }, table));
+  wrap.append(el("div", { class: "rb-note", style: "margin-top:8px" }, "Оригиналы на компьютере не меняются — «Применить» отдаёт ZIP с переименованными файлами."));
+  return wrap;
+}
+async function brApply() {
+  if (!brFiles.length) { toast("Выберите файлы (не только имена) для ZIP", "error"); return; }
+  const fd = new FormData();
+  brFiles.forEach((f) => fd.append("files", f));
+  fd.append("rules", JSON.stringify(brCollectRules()));
+  toast("Готовим ZIP…");
+  try {
+    const res = await fetch("/api/rename/apply", { method: "POST", body: fd });
+    if (res.status === 400) { const j = await res.json(); render($("#brOut"), renderRenamePlan(j.plan || {})); toast("План невалиден — исправьте", "error"); return; }
+    if (!res.ok) { toast("Не удалось применить", "error"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = el("a", { href: url, download: "renamed.zip" });
+    document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast("ZIP скачивается", "success");
+  } catch (e) { toast(String(e), "error"); }
 }
 
 // ---------- старт ----------

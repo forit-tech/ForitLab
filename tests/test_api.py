@@ -41,7 +41,8 @@ CURRENT = "\n".join(
 def test_service_info_lists_tools(client: TestClient) -> None:
     body = client.get("/api").json()
     assert body["service"] == "forit-lab"
-    assert any(tool["id"] == "drift" for tool in body["tools"])
+    ids = {tool["id"] for tool in body["tools"]}
+    assert {"parser", "chaos", "file_inspector", "unicode2", "rename", "print"} <= ids
 
 
 def test_root_serves_web_ui(client: TestClient) -> None:
