@@ -145,7 +145,9 @@ class Settings:
     collect_max_rows: int = _env_int("FORIT_COLLECT_MAX_ROWS", 5_000)
     collect_result_max_bytes: int = _env_int("FORIT_COLLECT_RESULT_MAX_BYTES", 16 * 1024 * 1024)
     collect_pages_per_step: int = _env_int("FORIT_COLLECT_PAGES_PER_STEP", 3)
-    collect_step_max_ms: int = _env_int("FORIT_COLLECT_STEP_MAX_MS", 8_000)
+    # Короткий шаг: за обратным прокси (nginx/preview) длинный одиночный запрос
+    # даёт 502. Держим шаг заведомо ниже типового gateway-таймаута.
+    collect_step_max_ms: int = _env_int("FORIT_COLLECT_STEP_MAX_MS", 3_500)
     collect_delay_ms: int = _env_int("FORIT_COLLECT_DELAY_MS", 200)
     #: Останавливаемся, если свободного места в state_dir меньше порога.
     collect_min_free_bytes: int = _env_int("FORIT_COLLECT_MIN_FREE_BYTES", 32 * 1024 * 1024)

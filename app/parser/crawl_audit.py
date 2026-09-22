@@ -152,6 +152,7 @@ class CrawlHandler:
             "statuses": state["statuses"],
             "columns": state["columns"],
             "queued": len(state["frontier"]),
+            "max_pages": max_pages,  # лимит обхода — чтобы UI не пугал «в очереди: 610»
             "stopped_reason": state["stopped"] or (None if not done else "весь сайт обойдён"),
             "partial": bool(state["stopped"]),
             "sample": list(result.read(limit=8)),

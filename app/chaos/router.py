@@ -156,7 +156,7 @@ def audit_start(payload: AuditRequest) -> dict:
 def audit_step(job_id: str, payload: StepRequest) -> dict:
     from ..exec import StepBudget
 
-    return _get_executor().step(job_id, cursor=payload.cursor, budget=StepBudget(max_units=999, max_ms=9000)).to_public()
+    return _get_executor().step(job_id, cursor=payload.cursor, budget=StepBudget(max_units=8, max_ms=3500)).to_public()
 
 
 @router.post("/audit/{job_id}/cancel", summary="Остановить проверку сайта")

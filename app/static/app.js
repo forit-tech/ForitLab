@@ -32,6 +32,8 @@ const el = (tag, props = {}, ...kids) => {
   return node;
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// URL для показа: раскодируем percent-encoding (кириллица читаемо), кривой ввод оставляем как есть.
+function prettyUrl(u) { try { return decodeURI(String(u || "")); } catch { return String(u || ""); } }
 const fmtNum = (n) => (typeof n === "number" ? n.toLocaleString("ru-RU") : n);
 
 // ---------- сеть ----------
@@ -994,10 +996,10 @@ $("#chTry").addEventListener("click", async () => {
 // =====================================================================
 let parserReady = false;
 const PA_MODE_NOTE = {
-  extract: "",
-  crawl: "",
-  audit: "",
-  explore: "",
+  extract: "Достаёт повторяющиеся данные (карточки, строки) в таблицу: находит источник, предлагает поля, даёт превью и экспорт CSV/JSON. Кнопка «Собрать все страницы» пройдёт пагинацию каталога.",
+  crawl: "Обходит сайт по внутренним ссылкам и строит карту страниц: коды ответов, редиректы, битые ссылки. По умолчанию не больше 50 страниц.",
+  audit: "Технический аудит по страницам сайта: title, description, H1, коды ответов и битые ссылки. По умолчанию не больше 50 страниц.",
+  explore: "Ручной HTTP-запрос как в Postman: метод, заголовки, тело — для отладки и не-GET. Обычный сбор данных — во вкладке Extract.",
 };
 let paMode = "extract";
 const paState = { input: "", base_url: "", schema: null };
@@ -1011,19 +1013,41 @@ async function initParserOnce() {
   $("#paGo").addEventListener("click", runParserGo);
   $("#paReset").addEventListener("click", () => { $("#paInput").value = ""; $("#paOut").replaceChildren(); paState.schema = null; $("#paInput").focus(); toast("Сброшено"); });
   $$("#paModes .pa-mode").forEach((btn) => btn.addEventListener("click", () => selectParserMode(btn.dataset.mode)));
+  selectParserMode(paMode);  // показать пояснение активного режима сразу при входе
 }
 function selectParserMode(mode) {
+  const changed = mode !== paMode;
   paMode = mode;
   $$("#paModes .pa-mode").forEach((b) => {
     const on = b.dataset.mode === mode;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", String(on));
   });
+  // Пояснение активного режима — показываем всегда, а не только для «дорожной карты».
   const note = $("#paModeNote");
-  const roadmap = PA_MODE_NOTE[mode] || "";
-  note.style.display = roadmap ? "" : "none";
-  note.textContent = roadmap;
-  if (roadmap) $("#paOut").replaceChildren(); // Crawl/Audit ещё не реализованы — не показываем чужой результат
+  const txt = PA_MODE_NOTE[mode] || "";
+  note.style.display = txt ? "" : "none";
+  note.textContent = txt;
+  // Смена режима: останавливаем текущий обход/сбор (чтобы не грузил сервер зря)
+  // и очищаем чужой результат — можно сразу запустить другое.
+  if (changed) {
+    stopActiveParserJobs();
+    $("#paOut").replaceChildren();
+  }
+}
+
+// Отменяет активные фоновые задачи Parser при СМЕНЕ режима. Best-effort.
+// Обнуляем ссылки — pump увидит paCrawl!==job и тихо выйдет, не рисуя чужой финал
+// в уже очищенный вывод (в отличие от кнопки «Отменить», где показываем «отменён»).
+function stopActiveParserJobs() {
+  if (paCrawl) {
+    api(`/api/parser/crawl/${paCrawl.job_id}/cancel`, { method: "POST" }).catch(() => {});
+    paCrawl = null;
+  }
+  if (paCollect) {
+    api(`/api/parser/collect/${paCollect.job_id}/cancel`, { method: "POST" }).catch(() => {});
+    paCollect = null;
+  }
 }
 // paGo диспетчеризует по активному режиму: Extract → сбор данных, Explore → разбор
 async function runParserGo() {
@@ -1407,6 +1431,7 @@ async function pumpCollect(holder) {
   const ui = collectUI(holder);
   const job = paCollect;
   while (true) {
+    if (!job || paCollect !== job) return;  // сменили режим/запустили другое — тихо выходим
     let st;
     try {
       st = await api(`/api/parser/collect/${job.job_id}/step`, {
@@ -1416,7 +1441,6 @@ async function pumpCollect(holder) {
     job.cursor = st.cursor;
     updateCollectUI(ui, st);
     if (["completed", "failed", "cancelled"].includes(st.status)) { finishCollect(holder, ui, st); return; }
-    if (job.cancelled && st.status === "running") { /* отмена уедет следующим статусом */ }
     await new Promise((r) => setTimeout(r, 120));
   }
 }
@@ -1679,6 +1703,7 @@ async function pumpCrawl(out) {
   const ui = crawlUI(out);
   const job = paCrawl;
   while (true) {
+    if (!job || paCrawl !== job) return;  // сменили режим/запустили другое — тихо выходим
     let st;
     try {
       st = await api(`/api/parser/crawl/${job.job_id}/step`, {
@@ -1690,10 +1715,10 @@ async function pumpCrawl(out) {
     if (ui.bar) { ui.bar.setProgress(st.progress || 0); ui.bar.setLabel(`${p.pages || 0} стр · ${p.broken || 0} broken`); }
     ui.stat.replaceChildren(...[
       el("span", { class: "chip active" }, `статус: ${st.status}`),
-      el("span", { class: "chip" }, `страниц: ${p.pages || 0}`),
+      el("span", { class: "chip" }, p.max_pages ? `страниц: ${p.pages || 0} / ${p.max_pages}` : `страниц: ${p.pages || 0}`),
       el("span", { class: "chip" }, `broken: ${p.broken || 0}`),
       el("span", { class: "chip" }, `redirects: ${p.redirects || 0}`),
-      p.queued ? el("span", { class: "chip" }, `в очереди: ${p.queued}`) : null,
+      p.queued ? el("span", { class: "chip" }, `найдено ссылок: ${p.queued}`) : null,
     ].filter(Boolean));
     if (["completed", "failed", "cancelled"].includes(st.status)) { await finishCrawl(ui.inner, st); return; }
     await new Promise((r) => setTimeout(r, 120));
@@ -1722,9 +1747,14 @@ function jobFailedNotice(st, count, label) {
 async function finishCrawl(inner, st) {
   const p = st.partial || {};
   const pages = p.pages || 0;
-  // Провал или ноль страниц: НЕ показываем зелёный вывод и не отдаём пустой экспорт
-  if (st.status === "failed" || st.status === "cancelled" || pages === 0) {
-    inner.append(jobFailedNotice(st, pages, "Аудит"));
+  const label = paCrawl && paCrawl.mode === "audit" ? "Аудит" : "Обход";
+  // Отмена — законный финал: показываем, сколько успели, без зелёного «всё ок».
+  if (st.status === "cancelled") {
+    inner.append(finding("info", "", `${label} остановлен. Успели обойти страниц: ${pages}.`));
+    return;
+  }
+  if (st.status === "failed" || pages === 0) {
+    inner.append(jobFailedNotice(st, pages, label));
     return;
   }
 
@@ -1802,7 +1832,7 @@ function renderSecurityReport(d) {
   const worst = s.high ? "alert" : s.medium ? "warn" : (s.low || s.info) ? "info" : "ok";
   wrap.append(el("div", { class: `verdict ${worst}` },
     el("span", { class: "big" }, d.https ? "🔒" : "⚠"),
-    el("span", {}, d.https ? `HTTPS · ${d.final_url}` : `Без HTTPS · ${d.final_url}`)));
+    el("span", {}, `${d.https ? "HTTPS" : "Без HTTPS"} · ${prettyUrl(d.final_url)}`)));
 
   wrap.append(el("div", { class: "chips", style: "margin-bottom:14px" },
     el("span", { class: `chip ${s.high ? "active" : ""}` }, `HIGH: ${s.high || 0}`),
@@ -1821,10 +1851,12 @@ function renderSecurityReport(d) {
     card.append(el("div", { class: "ent-top" },
       el("div", { class: "ent-meta" }, sevBadge(cls, f.severity.toUpperCase()), el("strong", {}, f.title)),
       el("span", { class: "muted mono" }, f.category)));
+    // el() вставляет строки как textContent (createTextNode) — это уже безопасно.
+    // Дополнительный esc() здесь давал двойное экранирование: <iframe> → &lt;iframe&gt;.
     card.append(el("dl", { class: "kv kv-wide" },
-      el("dt", { class: "muted" }, "Обнаружено"), el("dd", {}, esc(f.evidence)),
-      el("dt", { class: "muted" }, "Почему важно"), el("dd", {}, esc(f.why)),
-      el("dt", { class: "muted" }, "Как исправить"), el("dd", {}, esc(f.recommendation))));
+      el("dt", { class: "muted" }, "Обнаружено"), el("dd", {}, f.evidence),
+      el("dt", { class: "muted" }, "Почему важно"), el("dd", {}, f.why),
+      el("dt", { class: "muted" }, "Как исправить"), el("dd", {}, f.recommendation)));
     wrap.append(card);
   });
   return wrap;
@@ -1950,7 +1982,10 @@ async function runFileInspect() {
     return renderFileReport(await res.json());
   });
 }
-function fiStat(v, l) { return el("div", { class: "statcard" }, el("div", {}, el("div", { class: "sc-v" }, v), el("div", { class: "sc-l" }, l))); }
+function fiStat(v, l) {
+  const long = String(v).length > 22;
+  return el("div", { class: "statcard" }, el("div", {}, el("div", { class: `sc-v${long ? " long" : ""}`, title: String(v) }, v), el("div", { class: "sc-l" }, l)));
+}
 // Значение метаданных: короткое — как есть; крупное (XML/JSON/blob) — сворачиваем
 // в подпись типа с кнопками «показать полностью» и «копировать», не вываливая простыню.
 function fiMetaValue(m) {

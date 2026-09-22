@@ -81,6 +81,8 @@ main{padding-top:0}
 /* контент внутри инструментов ограничиваем по читаемости, но контейнер — во всю ширину как хедер */
 .view:not(#view-home) .tool-hero,
 .view:not(#view-home) .console,
+.view:not(#view-home) .pa-modes,
+.view:not(#view-home) > #paModeNote,
 .view:not(#view-home) > .rblock,
 .view:not(#view-home) > .panel,
 .view:not(#view-home) > [id$="Out"],
@@ -249,6 +251,7 @@ table.data th{color:var(--dim);font-weight:600} table.data td.num{text-align:rig
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-sm)}
 
 .verdict{padding:16px 18px;border-radius:var(--radius);margin-bottom:16px;font-weight:700;display:flex;align-items:center;gap:12px}
+.verdict>span{min-width:0;overflow-wrap:anywhere;word-break:break-word}
 .verdict.ok{background:color-mix(in srgb,var(--ok) 12%,transparent);border:1px solid var(--ok)}
 .verdict.warn{background:color-mix(in srgb,var(--warn) 12%,transparent);border:1px solid var(--warn)}
 .verdict.alert{background:color-mix(in srgb,var(--alert) 12%,transparent);border:1px solid var(--alert)}
@@ -328,14 +331,16 @@ pre.code{background:var(--input);border:1px solid var(--border);border-radius:va
 
 /* ---- stat-cards (сводка метрик) ---- */
 .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:0 0 8px}
-.statcard{position:relative;display:flex;align-items:center;gap:12px;padding:14px 15px;border-radius:14px;
+.statcard{position:relative;min-width:0;display:flex;align-items:center;gap:12px;padding:14px 15px;border-radius:14px;
   background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--border);transition:.18s}
 @media (hover:hover){.statcard:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--tacc) 55%,var(--border));
   box-shadow:0 12px 28px rgba(0,0,0,.4),0 0 20px color-mix(in srgb,var(--tacc) 20%,transparent)}}
 .statcard .sc-ic{width:36px;height:36px;flex:0 0 auto;border-radius:10px;display:grid;place-items:center;
   color:var(--tacc);border:1px solid color-mix(in srgb,var(--tacc) 35%,var(--border));background:rgba(5,4,6,.4)}
 .statcard .sc-ic svg{width:20px;height:20px}
-.statcard .sc-v{font-size:1.4rem;font-weight:800;line-height:1}
+.statcard>div{min-width:0}
+.statcard .sc-v{font-size:1.4rem;font-weight:800;line-height:1.05;overflow-wrap:anywhere;word-break:break-word}
+.statcard .sc-v.long{font-size:.9rem;font-weight:700;line-height:1.25}
 .statcard .sc-l{color:var(--dim);font-size:.78rem;margin-top:3px}
 .statcard.ok{--tacc:var(--ok)} .statcard.warn{--tacc:var(--warn)} .statcard.alert{--tacc:var(--alert)}
 

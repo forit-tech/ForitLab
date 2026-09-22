@@ -118,6 +118,46 @@ def test_collects_all_pages_into_one_dataset(tmp_path):
     assert rows[0]["title"] == "Товар 1-1"
 
 
+def test_tiny_step_budget_does_not_lose_pages(tmp_path):
+    """Короткий шаг (по 1 странице) собирает весь каталог без потерь и дублей.
+
+    Регрессия под приёмку №4: уменьшение step budget (до 3.5 с в проде) режет
+    работу на больше шагов, но состояние на курсоре+frontier не должно терять
+    или пропускать страницы между шагами.
+    """
+    ex, store = _executor(tmp_path, make_client(pages=6, per_page=2))
+    st = ex.start(build_plan("https://s.ex/cat?page=1", _schema(), {"max_pages": 20}))
+    cur = st.cursor
+    steps = 0
+    while st.status not in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED) and steps < 100:
+        # max_units=1 → ровно одна страница за шаг (жёстко «нарезанный» бюджет)
+        st = ex.step(st.id, cursor=cur, budget=StepBudget(max_units=1, max_ms=1))
+        cur = st.cursor
+        steps += 1
+    assert st.status == JobStatus.COMPLETED
+    assert st.partial["pages"] == 6
+    assert steps >= 6  # реально прошли многошагово, а не за один проход
+    rows = list(ResultFile(store.directory, st.id).read())
+    assert len(rows) == 12
+    titles = [r["title"] for r in rows]
+    assert len(set(titles)) == 12  # без дублей и пропусков — все 6×2 уникальны
+
+
+def test_cancel_leaves_no_live_job(tmp_path):
+    """После отмены задача терминальна и повторный step её не оживляет (нет zombie)."""
+    ex, store = _executor(tmp_path, make_client(pages=100, per_page=2))
+    st = ex.start(build_plan("https://s.ex/cat?page=1", _schema(), {"max_pages": 100}))
+    st = ex.step(st.id, cursor=st.cursor, budget=StepBudget(max_units=1, max_ms=1))
+    ex.cancel(st.id)
+    after = ex.status(st.id)
+    assert after.status == JobStatus.CANCELLED
+    pages_at_cancel = after.partial["pages"] if after.partial else 0
+    # повторный шаг после отмены не двигает задачу и не меняет счётчик
+    again = ex.step(st.id, cursor=after.cursor, budget=StepBudget(max_units=999, max_ms=9000))
+    assert again.status == JobStatus.CANCELLED
+    assert (again.partial["pages"] if again.partial else 0) == pages_at_cancel
+
+
 def test_progress_is_chunked(tmp_path):
     # с pages_per_step=3 (по умолчанию) 3 страницы соберутся за 1 шаг; проверим многошаговость на большем каталоге
     ex, store = _executor(tmp_path, make_client(pages=7, per_page=2))
